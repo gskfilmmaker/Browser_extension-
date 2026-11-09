@@ -1,0 +1,1 @@
+{"name":"ai-browser-agent","version":"1.0.0","private":true,"type":"module","scripts":{"test":"node --test tests/*.test.js","check":"node --check service-worker.js && node --check lib/browser.js && node --check lib/providers.js && node --check sidepanel/app.js && node --check options/app.js"}}

@@ -1,0 +1,91 @@
+# AI Browser Agent
+
+A dependency-free Manifest V3 Chrome extension with a persistent side panel, OpenAI and Anthropic streaming, browser tools, and approval-first execution. Load the source folder directly; no bundler, server, or npm install is required. Requires Chrome 120+.
+
+## Setup
+
+1. Download and extract this project to a permanent folder.
+2. Open `chrome://extensions`, turn on **Developer mode**, choose **Load unpacked**, and select the folder containing `manifest.json`.
+3. Pin **AI Browser Agent** in the extensions menu. Click its toolbar icon to open the side panel.
+4. Open Settings with the gear icon. Create a provider API key at [OpenAI](https://platform.openai.com/api-keys) or [Anthropic Console](https://console.anthropic.com/). API billing is separate from ChatGPT or Claude subscriptions. Enter keys only in the extension's Settings page.
+5. Select a provider and a model available to that account, then **Save settings**. Suggested IDs are editable; provider availability changes.
+6. Open an ordinary HTTP(S) page. Ask, for example: “Read this page and summarize the key points.” Review each approval card, including its target URL and arguments, and choose **Approve once** or **Deny**.
+7. Try “Fill the name field with Alex, but don't submit.” Approve the exact field input. Use **Stop** to cancel pending work. Use **New chat** to erase the current session conversation.
+
+## Permissions and safety
+
+Only permissions actually used are declared: `sidePanel`, `storage`, `scripting`, `debugger`, `tabs`, and HTTP(S) access through `<all_urls>`. `activeTab`, `tabGroups`, `webNavigation`, `offscreen`, and `unlimitedStorage` are intentionally omitted because this implementation does not need them. There is no persistent content script or offscreen document. Chrome debugger attachment displays Chrome's native debugging notice; the side panel status and toolbar badge identify active control.
+
+- **Ask before every action** (default): all tools, including reads, screenshots, and listing tabs, require approval before their data is sent to the provider.
+- **Auto with safety checks**: allowed page reads run automatically; page changes still require approval. Generic clicks cannot reliably be classified as safe from their text, so they are always confirmed.
+- **Trusted sites only**: only allowlisted hostnames are accessible; mutations still require approval. Reads are automatic on trusted sites.
+- Settings are captured at the start of a request; stop an active run before changing site policy. The blocklist takes precedence in every mode. Use `example.com` for one hostname and `*.example.com` for subdomains. There are no URL path rules. Navigation destinations and history targets are checked as well as current page URLs. Website redirects can still navigate a tab to a different site; subsequent tools check the resulting URL and reject blocked targets.
+- Approval expires after two minutes and applies once. If the tab URL changes while approval is pending, the operation is rejected. Page contents can still change without a URL change; inspect sensitive actions carefully.
+- Sensitive controls are defended with explicit approval for all mutations, a safety system prompt, and refusal to type into password, file, and hidden inputs. Enter passwords manually. Heuristics and model instructions are not a guarantee that malicious page content will be recognized.
+- Web content is treated as untrusted input in the system prompt. There is no arbitrary JavaScript or shell tool. Selectors and text are serialized into data literals rather than executable expressions.
+- Keys live in `chrome.storage.local`, restricted to trusted extension contexts, never synchronized or exposed to page scripts or tool output. They are **not encrypted at rest**. An encryption key stored beside a secret would not protect against profile access. Delete stored keys from Settings or remove the extension. Use a dedicated Chrome profile for sensitive workflows.
+- Conversation messages and completed tool results live in `chrome.storage.session` and clear when the browser session ends or the extension reloads. Screenshots are forwarded to the model for the active run but are not retained in conversation checkpoints. Tool output can contain personal information. Page text, accessibility names, console logs and screenshots cannot be fully redacted; approve only the data you want to transmit.
+- Only the chosen provider receives requests. No telemetry, remote scripts, external backend, or third-party dependencies. No keys in source or chat output.
+
+## Browser tools
+
+| Tool | Behavior |
+| --- | --- |
+| `read_page` | Top-frame visible text and a compact DOM outline, up to 350 elements / 24,000 text characters |
+| `get_page_text` | Top-frame visible text |
+| `get_accessibility_tree` | Chrome accessibility roles, names, relationships, up to 500 non-ignored nodes |
+| `take_screenshot` | JPEG viewport screenshot passed as a native image to the provider |
+| `click_element` | CSS selector, exact visible text, or viewport coordinates; debugger mouse events |
+| `type_text` | Debugger insertion into the focused editable field, without Enter |
+| `form_input` | Focus a CSS-selected field, select existing text, insert replacement text |
+| `navigate` | HTTP(S) URL, back, forward, reload |
+| `scroll` | Debugger wheel events with pixel deltas |
+| `read_console_messages` | Last 100 console events observed since debugger attachment |
+| `get_tabs_context` | Policy-filtered tab IDs, titles, URLs, active states and window IDs |
+| `switch_tab`, `create_tab`, `close_tab` | Tab management; switched/created tab becomes the agent's target |
+| `wait_for_element`, `wait_for_load` | Bounded polling, maximum 15 seconds |
+
+The target is captured at the start of each user request. Tools can specify a tab ID, and switching or creating tabs updates the target for later tools. DevTools or another extension may conflict with debugger attachment. Chrome-internal pages, Chrome Web Store pages, restricted tabs, PDFs, and browser UI may reject injection or debugging; use normal web pages. DOM selectors address the top frame and do not traverse iframes or shadow roots. Native selects, file uploads, browser dialogs, downloads, drag-and-drop, and CAPTCHA are not implemented. Coordinate clicks use CSS viewport pixels and can become stale after layout changes. The agent must read and verify its work.
+
+## Architecture
+
+- `manifest.json`: MV3 registration and restrictive extension-page CSP.
+- `service-worker.js`: authoritative run ownership, bounded tool loop, approval workflow, cancellation, session checkpoints, and toolbar activity badge.
+- `lib/providers.js`: native OpenAI Chat Completions function calling and Anthropic Messages tool use. Incremental SSE parsing handles fragmented UTF-8 and CRLF. Tool results use provider-specific roles; screenshots become native image content. Tool calls run serially.
+- `lib/browser.js`: Chrome Debugger Protocol tools and on-demand isolated-world extraction.
+- `lib/tools.js`: shared JSON schemas for both providers.
+- `lib/policy.js`: site rules, mutation approval, argument checks, and safety prompt.
+- `content/extract.js`: injected page extraction, with no long-lived page messaging bridge.
+- `sidepanel/`: accessible vanilla JavaScript chat with incremental text, expandable tool results, approval cards, and stop control.
+- `options/`: API keys, model IDs, site lists, and default limits.
+
+Only one run executes at a time. Requests are spaced by at least three seconds. Each request has a ten-minute time limit and a default limit of 20 model rounds (configurable up to 40). Provider errors, incomplete streams, malformed tool arguments, and tool errors appear in the UI. HTTP 429 reports Retry-After if present. Requests are not automatically retried to avoid duplicate costs. A 20-second Chrome API heartbeat maintains active worker activity; unexpected service-worker termination never silently resumes actions. On restart, interrupted runs are marked interrupted and pending approvals are discarded. Stop aborts provider streaming and pending approval, and prevents subsequent tools; a Chrome command already dispatched can finish. A debugger attachment is detached at run completion or cancellation.
+
+Conversation checkpoints preserve completed turns for follow-up requests within the browser session. Start a new chat when the conversation becomes large or if an API reports a context limit. Model costs and available context windows vary; the extension does not calculate billing or automatically summarize private data.
+
+## Validation
+
+Run with Node 20+:
+
+```sh
+npm run check
+npm test
+```
+
+The unit suite checks permission policy, site boundaries, argument validation, fragmented SSE, both provider message formats and streamed tool inputs, incomplete streams, and HTTP failures. No API key is needed for these tests.
+
+A Chromium integration harness is included at `tests/browser_test.py`. It requires Python Playwright and a local Chromium executable (`/usr/bin/chromium` by default); run `python tests/browser_test.py`. It launches the real unpacked extension with a local fixture and mocks only provider HTTP responses. It checks debugger input/clicks, text and accessibility extraction, screenshots, options validation, and the approval-to-tool-to-answer loop. It uses a temporary profile and never accesses your normal browser profile. Live provider requests require your keys and are not exercised by this suite.
+
+## Release considerations
+
+This is an unpacked extension implementation, not a Chrome Web Store submission. Before distributing to other users, perform a security review and a manual cross-site test matrix, publish a privacy policy, and verify the current Chrome Web Store debugger/host-permission requirements. API accounts, paid usage, authentication workflows, site changes and browser restrictions remain outside automated coverage.
+
+### Results from this build environment
+
+- JavaScript syntax checks and all 8 unit tests passed.
+- Real Chromium CDP checks passed for text extraction, accessibility tree, field replacement, clicking, screenshots, scrolling and element waits.
+- The actual service-worker module completed a read/fill/click run through three approval gates, using Chrome API adapters backed by real CDP and mocked provider streams.
+- Side panel rendering and options save/hostname validation passed with no page errors.
+- Native unpacked loading was blocked by the environment's managed `ExtensionInstallBlocklist` policy. Native Chrome extension API wiring and live provider requests are not verified here. The policy was not changed.
+
+The policy-compatible CDP/worker/UI test is included as `tests/cdp_test.py`; it uses Python Playwright and the system Chromium. Run `python tests/cdp_test.py`. Chrome API adapters in this test are explicitly separate from native extension integration.
