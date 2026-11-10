@@ -1,7 +1,7 @@
 # Chrome Web Store Listing — FramePilot
 
 > Last Updated: 2026-11-10
-> Version 1.1.0 · Draft, not submitted or published.
+> Version 1.2.0 · Draft, not submitted or published.
 
 ## Store Listing
 
@@ -13,7 +13,7 @@
 
 FramePilot helps you read web pages, work across tabs, and complete browser tasks from a persistent side chat.
 
-Ask questions about a page, summarize text, inspect what is on screen, navigate websites, and fill supported form fields. Choose OpenAI or Anthropic as your AI provider. All page-changing actions require your approval, and you can stop the agent at any time.
+Ask questions about a page, summarize text, inspect what is on screen, navigate websites, and fill supported form fields. Choose OpenAI or Anthropic as your AI provider. Routine browsing and drafting run automatically. Detected critical actions and unrecognized controls require confirmation, and you can stop the agent at any time. Detection is heuristic; optional strict mode asks before every tool.
 
 Install FramePilot, open the toolbar icon, and configure your provider key in Settings. Provider access and usage charges are separate from FramePilot. Start with a simple page summary, then review the exact target and arguments before approving actions.
 
@@ -37,7 +37,7 @@ Support: https://github.com/gskfilmmaker/Browser_extension-/issues
 | Store icon | 128×128 PNG | Created | `icons/icon-128.png` |
 | Chrome icons | 16, 32, 48px PNG | Created | `icons/icon-*.png` |
 | Required screenshot | 1280×800 or 640×400 | Pending native installed-extension capture | Not yet created |
-| UI preview | 380×820 PNG | Test-runtime preview; not a store screenshot | `brand/ui-preview.png` |
+| UI preview | 380×820 PNG | Updated for 1.2 with a test adapter; not a store screenshot | `brand/ui-preview.png` |
 | Small promo tile | 440×280 PNG | Created; review before submission | `brand/promo-small.png` |
 | Marquee promo tile | 1400×560 PNG | Created; review before submission | `brand/promo-marquee.png` |
 | Logo masters and exports | SVG, PNG | Created | `brand/logo-light.*`, `brand/logo-dark.*` |
@@ -105,11 +105,12 @@ The store developer account's displayed publisher identity is configured in the 
 
 | Version | Date | Changes | Status |
 | --- | --- | --- | --- |
+| 1.2.0 | 2026-11-10 | Automatic routine browsing; critical-action detection and revalidation; visible approval buttons; one-time settings migration. | Draft |
 | 1.1.0 | 2026-11-10 | FramePilot identity, GSK Productions Inc. attribution, vector logo kit, Chrome icons, updated UI and promotional assets. | Draft |
 | 1.0.0 | 2026-11-09 | Initial AI Browser Agent implementation with two providers, page tools and approvals. | Unpacked development build |
 
 ## Review Notes
 
-Native unpacked extension loading is blocked by the development environment's managed Chrome policy. Syntax and provider/policy unit tests and a CDP-backed tool/worker/UI test are available; live provider calls and native extension integration still require verification on the publisher's computer. Password entry, uploads, CAPTCHA, browser dialogs, native selects, nested-frame selectors and shadow-root selectors are not supported. All mutations require approval in every mode. The branding update changes no permissions or data flows.
+Native unpacked extension loading is blocked by the development environment's managed Chrome policy. Syntax and provider/policy unit tests and a CDP-backed tool/worker/UI test are available; live provider calls and native extension integration still require verification on the publisher's computer. Password entry, uploads, CAPTCHA, browser dialogs, native selects, nested-frame selectors and shadow-root selectors are not supported. Automatic mode is the default and executes routine page reads and interactions without per-step confirmation. Critical and unrecognized targets require approval; strict mode remains available. Labels and form context are heuristic evidence, not a guarantee. This release adds no permissions or new data destinations, but default automatic reads mean page context can be transmitted without a separate per-read dialog; disclose this in the public policy and onboarding. Existing installs migrate once to Automatic mode, preserving trusted-only restrictions and credentials.
 
 Before submission: verify native installation and live provider calls; capture correctly sized screenshots; publish an accurate privacy policy; supply a support email; verify publisher identity and name availability; complete the store disclosure form. `python scripts/package.py` creates a runtime-only ZIP excluding `.git`, tests, artwork, scripts, and this listing document.

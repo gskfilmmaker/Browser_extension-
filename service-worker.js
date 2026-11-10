@@ -1,10 +1,10 @@
-import {defaults,SYSTEM,needsApproval,checkURL,validateArgs} from './lib/policy.js';
+import {defaults,SYSTEM,needsApproval,checkURL,validateArgs,migrateSettings} from './lib/policy.js';
 import {tools} from './lib/tools.js';
 import {complete} from './lib/providers.js';
-import {execute,target,detachAll} from './lib/browser.js';
+import {execute,target,detachAll,prepareAction} from './lib/browser.js';
 let conversation=[];
 let state={messages:[],running:false,pending:null,status:'Ready'},controller=null,pendingResolve=null,lastStart=0;
-const boot=(async()=>{await chrome.storage.local.setAccessLevel({accessLevel:'TRUSTED_CONTEXTS'});const cached=await chrome.storage.session.get(['state','conversation']);conversation=cached.conversation||[];const saved=cached.state;if(saved)state={...saved,running:false,pending:null,status:saved.running?'Previous run interrupted. Start a new request.':'Ready'};await save();})();
+const boot=(async()=>{await chrome.storage.local.setAccessLevel({accessLevel:'TRUSTED_CONTEXTS'});const stored=(await chrome.storage.local.get('settings')).settings;const migrated=migrateSettings(stored);if(stored?.permissionPolicyVersion!==2)await chrome.storage.local.set({settings:migrated});const cached=await chrome.storage.session.get(['state','conversation']);conversation=cached.conversation||[];const saved=cached.state;if(saved)state={...saved,running:false,pending:null,status:saved.running?'Previous run interrupted. Start a new request.':'Ready'};await save();})();
 async function save(){await chrome.storage.session.set({state});chrome.runtime.sendMessage({type:'state',state}).catch(()=>{});}
 function message(role,text,extra={}){const m={id:crypto.randomUUID(),role,text,...extra};state.messages.push(m);return m;}
 chrome.runtime.onInstalled.addListener(async()=>{await chrome.sidePanel.setPanelBehavior({openPanelOnActionClick:true});});
@@ -22,13 +22,13 @@ chrome.runtime.onMessage.addListener((m,sender,reply)=>{
  default:throw Error('Unknown message.');}
  })().then(reply,e=>reply({error:e.message}));return true;
 });
-async function approve(name,args,ctx){
+async function approve(name,args,ctx,risk){
  const id=crypto.randomUUID();let t=null;
  if(name!=='get_tabs_context'&&name!=='create_tab')t=await target(args.tabId??ctx.tabId,ctx.settings);
  const url=t?.url||args.url||'All permitted HTTP(S) tabs';
- state.pending={id,name,args,url,tabId:t?.id,title:t?.title,notice:'This action can expose page data to your AI provider or change the website. Check the exact target and arguments.'};state.status='Waiting for approval';await save();
+ state.pending={id,name,args,url,tabId:t?.id,title:t?.title,notice:risk.reason,level:risk.level};state.status='Waiting for approval';await save();
  const yes=await new Promise(resolve=>{const timer=setTimeout(()=>{pendingResolve=null;resolve(false);},120000);pendingResolve=v=>{clearTimeout(timer);pendingResolve=null;resolve(v);};});
- state.pending=null;await save();if(!yes||ctx.signal.aborted)throw Error('Action denied, expired, or stopped.');
+ state.pending=null;await save();if(!yes||ctx.signal.aborted){ctx.denied=true;throw Error('Action denied, expired, or stopped.');}
  if(t){const current=await target(t.id,ctx.settings);if(current.url!==url)throw Error('The page navigated after approval was requested. Please retry.');}
 }
 async function run(text){
@@ -37,7 +37,8 @@ async function run(text){
  // Chrome API activity keeps an active run alive; no unattended resumption after termination.
  keepAlive=setInterval(()=>chrome.runtime.getPlatformInfo().catch(()=>{}),20000);
  const settings={...defaults,...(await chrome.storage.local.get('settings')).settings};
- const [tab]=await chrome.tabs.query({active:true,lastFocusedWindow:true});
+ let [tab]=await chrome.tabs.query({active:true,lastFocusedWindow:true});
+ if(tab?.url?.startsWith(chrome.runtime.getURL(''))){const candidates=await chrome.tabs.query({lastFocusedWindow:true});tab=candidates.filter(t=>/^https?:/.test(t.url||'')).sort((a,b)=>(b.lastAccessed||0)-(a.lastAccessed||0))[0];}
  const ctx={settings,tabId:tab?.id,signal};
  message('user',text);state.status='Thinking';await save();
  // Checkpoints contain completed tool turns only; screenshot bytes are not retained.
@@ -56,11 +57,14 @@ async function run(text){
  let result;
  try{
  if(call.args.url)checkURL(call.args.url,settings);
- if(needsApproval(call.name,settings.mode))await approve(call.name,call.args,ctx);
+ const prepared=await prepareAction(call.name,call.args,ctx);
+ const required=needsApproval(call.name,settings.mode,prepared.risk);
+ if(required)await approve(call.name,call.args,ctx,prepared.risk);
+ ctx.authorization={signature:prepared.signature,approved:required};
  signal.throwIfAborted();state.status=`Controlling page · ${call.name}`;await chrome.action.setBadgeText({text:'RUN'});await chrome.action.setBadgeBackgroundColor({color:'#ba5429'});await save();
  result=await execute(call.name,call.args,ctx);signal.throwIfAborted();
  item.result=result.image?{screenshot:'Captured and sent to provider',mime:result.mime}:result;
- }catch(e){if(signal.aborted)throw e;result={error:e.message};item.result=result;}
+ }catch(e){if(signal.aborted||ctx.denied)throw e;result={error:e.message};item.result=result;}
  history.push({role:'tool',id:call.id,...(result.image?{image:result.image}:{result})});await save();
  await chrome.action.setBadgeText({text:''});
  }

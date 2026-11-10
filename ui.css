@@ -101,3 +101,20 @@ footer > .developer-credit { color: #626c7c; font-size: 8px; letter-spacing: .2p
   .toolbar { padding-inline: 14px; gap: 7px; }
   #messages { padding-inline: 18px; }
 }
+
+/* Keep the decision controls outside the scrolling detail area, including short panels. */
+#approval { display: flex; flex-direction: column; flex: 0 1 auto; min-height: 130px; max-height: 45dvh; overflow: hidden; padding: 0; }
+#approval > strong { flex-shrink: 0; padding: 12px 14px 6px; }
+.approval-detail { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 0 14px; }
+.approval-detail p { margin: 6px 0 10px; }
+.approval-detail pre { max-height: none; }
+.approval-actions { display: flex; flex-shrink: 0; gap: 8px; padding: 10px 14px; border-top: 1px solid #d9b378; background: #fff1d9; }
+#approval .approval-actions button { margin: 0; }
+.panel:has(#approval:not([hidden])) footer #prompt { height: 44px; }
+.panel:has(#approval:not([hidden])) footer .developer-credit { display: none; }
+@media (max-height: 600px) {
+ .panel:has(#approval:not([hidden])) header { padding-block: 10px; }
+ .panel:has(#approval:not([hidden])) .toolbar { padding-block: 7px; }
+ .panel:has(#approval:not([hidden])) #messages { padding-block: 4px; }
+ .panel:has(#approval:not([hidden])) footer { padding-block: 7px; }
+}

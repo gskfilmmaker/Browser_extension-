@@ -5,7 +5,7 @@
 **Your browser. In motion.**
 Developed by **GSK Productions Inc.**
 
-A dependency-free Manifest V3 Chrome extension with a persistent side panel, OpenAI and Anthropic streaming, browser tools, and approval-first execution. Load the source folder directly; no bundler, server, or npm install is required. Requires Chrome 120+.
+A dependency-free Manifest V3 Chrome extension with a persistent side panel, OpenAI and Anthropic streaming, browser tools, and automatic routine execution with critical-action confirmation. Load the source folder directly; no bundler, server, or npm install is required. Requires Chrome 120+.
 
 ## Setup
 
@@ -14,19 +14,19 @@ A dependency-free Manifest V3 Chrome extension with a persistent side panel, Ope
 3. Pin **FramePilot** in the extensions menu. Click its toolbar icon to open the side panel.
 4. Open Settings with the gear icon. Create a provider API key at [OpenAI](https://platform.openai.com/api-keys) or [Anthropic Console](https://console.anthropic.com/). API billing is separate from ChatGPT or Claude subscriptions. Enter keys only in the extension's Settings page.
 5. Select a provider and a model available to that account, then **Save settings**. Suggested IDs are editable; provider availability changes.
-6. Open an ordinary HTTP(S) page. Ask, for example: “Read this page and summarize the key points.” Review each approval card, including its target URL and arguments, and choose **Approve once** or **Deny**.
+6. Open an ordinary HTTP(S) page. Ask, for example: “Read this page and summarize the key points.” Routine steps run automatically. If a critical or unrecognized action needs confirmation, review the target and arguments and choose **Approve once** or **Deny**.
 7. Try “Fill the name field with Alex, but don't submit.” Approve the exact field input. Use **Stop** to cancel pending work. Use **New chat** to erase the current session conversation.
 
 ## Permissions and safety
 
 Only permissions actually used are declared: `sidePanel`, `storage`, `scripting`, `debugger`, `tabs`, and HTTP(S) access through `<all_urls>`. `activeTab`, `tabGroups`, `webNavigation`, `offscreen`, and `unlimitedStorage` are intentionally omitted because this implementation does not need them. There is no persistent content script or offscreen document. Chrome debugger attachment displays Chrome's native debugging notice; the side panel status and toolbar badge identify active control.
 
-- **Ask before every action** (default): all tools, including reads, screenshots, and listing tabs, require approval before their data is sent to the provider.
-- **Auto with safety checks**: allowed page reads run automatically; page changes still require approval. Generic clicks cannot reliably be classified as safe from their text, so they are always confirmed.
-- **Trusted sites only**: only allowlisted hostnames are accessible; mutations still require approval. Reads are automatic on trusted sites.
+- **Automatic · confirm critical actions** (default): reading, screenshots, listing tabs, navigation, scrolling, ordinary clicks and regular field edits run without repeated prompts. Detected sending, deletion, purchases, credential/account-security actions, non-search form submissions and uninspectable targets require approval. Drafting is separate from sending.
+- **Ask before every action**: optional strict mode; all tools require approval, including reads and screenshots.
+- **Automatic · trusted sites only**: the automatic policy applies only to allowlisted hostnames. Critical and unrecognized controls still require confirmation.
 - Settings are captured at the start of a request; stop an active run before changing site policy. The blocklist takes precedence in every mode. Use `example.com` for one hostname and `*.example.com` for subdomains. There are no URL path rules. Navigation destinations and history targets are checked as well as current page URLs. Website redirects can still navigate a tab to a different site; subsequent tools check the resulting URL and reject blocked targets.
-- Approval expires after two minutes and applies once. If the tab URL changes while approval is pending, the operation is rejected. Page contents can still change without a URL change; inspect sensitive actions carefully.
-- Sensitive controls are defended with explicit approval for all mutations, a safety system prompt, and refusal to type into password, file, and hidden inputs. Enter passwords manually. Heuristics and model instructions are not a guarantee that malicious page content will be recognized.
+- Approval expires after two minutes and applies once. If the tab URL changes while approval is pending, the operation is rejected. The inspected target description is checked again immediately before execution. If it changed, the action is rejected and must be planned again. Web pages can still change during dispatch; this cannot make arbitrary websites race-free.
+- Critical-action detection uses the actual target labels, field types, autocomplete metadata, form/dialog context, navigation targets and an agent-supplied flag that can only raise risk. The browser executor independently checks authorization. Password, file, and hidden inputs remain unsupported. Enter passwords manually. This is heuristic protection, not a guarantee: unusual, mislabeled, non-English, or malicious controls can evade classification. Automatic mode authorizes sending page context to your selected provider and executing routine interactions without per-step approval. Use strict mode for workflows where this tradeoff is unacceptable.
 - Web content is treated as untrusted input in the system prompt. There is no arbitrary JavaScript or shell tool. Selectors and text are serialized into data literals rather than executable expressions.
 - Keys live in `chrome.storage.local`, restricted to trusted extension contexts, never synchronized or exposed to page scripts or tool output. They are **not encrypted at rest**. An encryption key stored beside a secret would not protect against profile access. Delete stored keys from Settings or remove the extension. Use a dedicated Chrome profile for sensitive workflows.
 - Conversation messages and completed tool results live in `chrome.storage.session` and clear when the browser session ends or the extension reloads. Screenshots are forwarded to the model for the active run but are not retained in conversation checkpoints. Tool output can contain personal information. Page text, accessibility names, console logs and screenshots cannot be fully redacted; approve only the data you want to transmit.
@@ -59,7 +59,8 @@ The target is captured at the start of each user request. Tools can specify a ta
 - `lib/providers.js`: native OpenAI Chat Completions function calling and Anthropic Messages tool use. Incremental SSE parsing handles fragmented UTF-8 and CRLF. Tool results use provider-specific roles; screenshots become native image content. Tool calls run serially.
 - `lib/browser.js`: Chrome Debugger Protocol tools and on-demand isolated-world extraction.
 - `lib/tools.js`: shared JSON schemas for both providers.
-- `lib/policy.js`: site rules, mutation approval, argument checks, and safety prompt.
+- `lib/policy.js`: site rules, critical-action approval policy, settings migration, argument checks, and safety prompt.
+- `lib/action-risk.js` and `lib/inspect-action.js`: action classification and isolated-world target inspection without reading field values.
 - `content/extract.js`: injected page extraction, with no long-lived page messaging bridge.
 - `sidepanel/`: accessible vanilla JavaScript chat with incremental text, expandable tool results, approval cards, and stop control.
 - `options/`: API keys, model IDs, site lists, and default limits.
@@ -87,9 +88,10 @@ This is an unpacked extension implementation, not a Chrome Web Store submission.
 
 ### Results from this build environment
 
-- JavaScript syntax checks and all 8 unit tests passed.
+- JavaScript syntax checks and all 12 unit tests passed.
 - Real Chromium CDP checks passed for text extraction, accessibility tree, field replacement, clicking, screenshots, scrolling and element waits.
-- The actual service-worker module completed a read/fill/click run through three approval gates, using Chrome API adapters backed by real CDP and mocked provider streams.
+- The actual service-worker module passed strict-mode approval checks and an automatic read/fill/click sequence with no routine prompts, followed by a gated Send action. Missing approvals and changed-target approvals were rejected, using Chrome API adapters backed by real CDP and mocked provider streams.
+- Approval buttons remained inside the viewport at 320×480, 380×600 and 600×820 with long action details.
 - Side panel rendering and options save/hostname validation passed with no page errors.
 - Native unpacked loading was blocked by the environment's managed `ExtensionInstallBlocklist` policy. Native Chrome extension API wiring and live provider requests are not verified here. The policy was not changed.
 
@@ -109,4 +111,10 @@ git pull origin main
 
 Then open `chrome://extensions`, find the extension (formerly AI Browser Agent), and click **Reload**. Close and reopen the side panel. If you downloaded a ZIP instead, extract the updated source and reload your existing extension from the same folder.
 
-To create a small runtime-only installation ZIP, run `python scripts/package.py` (or `npm run package`). The result is `dist/framepilot-1.1.0.zip`; extract it and select its folder in **Load unpacked**. No build step is needed to load the source directly.
+To create a small runtime-only installation ZIP, run `python scripts/package.py` (or `npm run package`). The result is `dist/framepilot-1.2.0.zip`; extract it and select its folder in **Load unpacked**. No build step is needed to load the source directly.
+
+## Version 1.2.0 — automatic routine browsing
+
+On the first start after upgrading from version 1.1, settings migrate once to Automatic mode as requested by the product owner. Existing trusted-only mode and all site lists, credentials and model choices are preserved. A subsequent explicit choice of Ask before every action is retained on later restarts. Mode changes apply to the next request; stop an active task first.
+
+Critical approval cards now have independently scrolling details and always-visible decision buttons. Denying or expiring an approval ends the run rather than allowing repeated attempts. If a new task starts while FramePilot's own Settings tab is active, the most recently accessed ordinary web tab in that window is selected; check tool targets when multiple tabs are open. No new Chrome permissions or provider destinations were added.

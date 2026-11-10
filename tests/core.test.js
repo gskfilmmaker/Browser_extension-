@@ -1,8 +1,46 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {checkURL,defaults,hostMatches,needsApproval,validateArgs} from '../lib/policy.js';
+import {checkURL,defaults,hostMatches,needsApproval,validateArgs,migrateSettings} from '../lib/policy.js';
+import {classifyAction} from '../lib/action-risk.js';
 import {sse,complete,openaiMessages,anthropicMessages} from '../lib/providers.js';
 test('site policy blocks privileged schemes and honors domain boundaries',()=>{for(const url of ['chrome://settings','javascript:alert(1)','file:///tmp/a','data:text/html,x'])assert.throws(()=>checkURL(url,defaults));assert.equal(hostMatches('evil-example.com','*.example.com'),false);assert.equal(hostMatches('a.example.com','*.example.com'),true);assert.equal(hostMatches('example.com','*.example.com'),false);assert.throws(()=>checkURL('https://example.com',{...defaults,mode:'trusted'}));assert.throws(()=>checkURL('https://example.com',{...defaults,mode:'trusted',allowlist:['example.com'],blocklist:['example.com']}));});
-test('all changes require approval; read access defaults to approval',()=>{assert.equal(needsApproval('read_page','ask'),true);assert.equal(needsApproval('read_page','auto'),false);for(const mode of ['ask','auto','trusted'])for(const tool of ['click_element','navigate','type_text','close_tab','scroll'])assert.equal(needsApproval(tool,mode),true);});
+test('automatic mode allows routine actions but keeps critical and unknown approvals',()=>{
+ for(const tool of ['read_page','click_element','navigate','type_text','close_tab','scroll']){
+  assert.equal(needsApproval(tool,'auto',{level:'routine'}),false);
+  assert.equal(needsApproval(tool,'trusted',{level:'routine'}),false);
+  assert.equal(needsApproval(tool,'ask',{level:'routine'}),true);
+  assert.equal(needsApproval(tool,'auto',{level:'critical'}),true);
+  assert.equal(needsApproval(tool,'auto',{level:'unknown'}),true);
+ }
+});
+test('migration enables requested automatic mode once and preserves keys and trusted restrictions',()=>{
+ assert.equal(migrateSettings({mode:'ask',openaiKey:'local-test'}).mode,'auto');
+ assert.equal(migrateSettings({mode:'ask',openaiKey:'local-test'}).openaiKey,'local-test');
+ assert.equal(migrateSettings({mode:'trusted',allowlist:['example.com']}).mode,'trusted');
+ assert.equal(migrateSettings({mode:'ask',permissionPolicyVersion:2}).mode,'ask');
+});
+const regular={found:true,label:'Continue',id:'next',type:'button',context:''};
+test('routine search, reading, drafting and ordinary controls do not prompt',()=>{
+ for(const name of ['read_page','scroll','navigate','switch_tab','close_tab'])assert.equal(classifyAction(name,{},null).level,'routine');
+ assert.equal(classifyAction('click_element',{},regular).level,'routine');
+ assert.equal(classifyAction('form_input',{text:'Please delete this sentence'},{...regular,label:'Draft message',type:'textarea'}).level,'routine');
+ assert.equal(classifyAction('form_input',{text:'password reset'},{...regular,label:'Search mail',type:'search'}).level,'routine');
+ assert.equal(classifyAction('click_element',{}, {...regular,label:'Search',submit:true,search:true}).level,'routine');
+});
+test('critical controls are detected from the actual DOM even if model claims safe',()=>{
+ for(const label of ['Send','Delete message','Move to trash','Buy now','Place order','Publish','Share','Change password','Sign in','Revoke access']){
+  assert.equal(classifyAction('click_element',{critical:false},{...regular,label}).level,'critical',label);
+ }
+ for(const label of ['New password','API key','Card number','Verification code'])assert.equal(classifyAction('form_input',{}, {...regular,label}).level,'critical',label);
+ assert.equal(classifyAction('click_element',{}, {...regular,label:'Save',context:'Change your password'}).level,'critical');
+ assert.equal(classifyAction('click_element',{}, {...regular,label:'Continue',submit:true,search:false}).level,'critical');
+ assert.equal(classifyAction('click_element',{critical:true},regular).level,'critical');
+});
+test('uninspectable targets and dangerous navigation cannot bypass approval',()=>{
+ assert.equal(classifyAction('click_element',{x:1,y:2},null).level,'unknown');
+ assert.equal(classifyAction('click_element',{}, {...regular,label:'',id:''}).level,'unknown');
+ assert.equal(classifyAction('click_element',{}, {...regular,crossFrame:true}).level,'unknown');
+ for(const url of ['https://example.com/delete?id=1','https://example.com/logout','https://example.com/transfer?to=a'])assert.equal(classifyAction('navigate',{url}).level,'critical');
+});
 test('invalid arguments fail closed',()=>{assert.throws(()=>validateArgs('click_element',{}));assert.throws(()=>validateArgs('form_input',{selector:'#a'}));assert.throws(()=>validateArgs('close_tab',{tabId:-1}));validateArgs('click_element',{x:0,y:0});});
 test('SSE parser handles chunk boundaries, CRLF and multibyte text',async()=>{const bytes=new TextEncoder().encode('data: {"text":"é"}\r\n\r\ndata: {"n":2}\n\ndata: [DONE]\n\n');const stream=new ReadableStream({start(c){for(const b of bytes)c.enqueue(Uint8Array.of(b));c.close();}});const events=[];for await(const e of sse(stream))events.push(e);assert.deepEqual(events,[{text:'é'},{n:2}]);});
 const h=[{role:'system',text:'safe'},{role:'user',text:'hello'},{role:'assistant',text:'',calls:[{id:'a',name:'read_page',args:{}}]},{role:'tool',id:'a',result:{text:'page'}}];

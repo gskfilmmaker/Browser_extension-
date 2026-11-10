@@ -6,7 +6,19 @@ function render(s){state=s;$('#status').textContent=s.status;$('#status').classL
  if(s.messages.length){box.replaceChildren();for(const m of s.messages){if(m.role==='tool'){const d=node('details','', 'tool');d.append(node('summary',m.text),node('pre',JSON.stringify({arguments:m.args,result:m.result},null,2)));box.append(d);}else box.append(node('article',m.text||(s.running?'Thinking…':''),`message ${m.role}`));}}
  else if(!box.querySelector('.welcome'))box.replaceChildren(node('div','Start a new journey with FramePilot. What would you like to do?','welcome'));
  if(nearBottom)box.scrollTop=box.scrollHeight;
- const approval=$('#approval');approval.hidden=!s.pending;approval.replaceChildren();if(s.pending){const p=s.pending;approval.append(node('strong',`Approve ${p.name}?`),node('p',p.url),node('p',p.notice),node('pre',JSON.stringify(p.args,null,2)));for(const [label,approved]of [['Deny',false],['Approve once',true]]){const b=node('button',label);b.onclick=()=>send({type:'approve',id:p.id,approved}).catch(error);approval.append(b);}}
+ const approval=$('#approval');approval.hidden=!s.pending;
+ if(!s.pending){approval.replaceChildren();delete approval.dataset.pendingId;}
+ else if(approval.dataset.pendingId!==s.pending.id){
+  const p=s.pending;approval.dataset.pendingId=p.id;approval.replaceChildren();
+  const heading=node('strong',p.level==='critical'?'Confirm critical action':p.level==='unknown'?'Check this action':`Approve ${p.name}?`);
+  const detail=node('div','','approval-detail');detail.append(node('p',p.notice),node('p',p.url),node('pre',JSON.stringify(p.args,null,2)));
+  const actions=node('div','','approval-actions');
+  for(const [label,approved]of [['Deny',false],['Approve once',true]]){
+   const b=node('button',label);b.onclick=async()=>{for(const button of actions.querySelectorAll('button'))button.disabled=true;try{await send({type:'approve',id:p.id,approved});}catch(e){for(const button of actions.querySelectorAll('button'))button.disabled=false;error(e);}};actions.append(b);
+  }
+  approval.append(heading,detail,actions);
+ }
+
 }
 function error(e){$('#status').textContent=e.message;}
 $('#settings').onclick=()=>chrome.runtime.openOptionsPage();
@@ -14,6 +26,6 @@ $('#chat').onsubmit=async e=>{e.preventDefault();try{await send({type:'start',te
 $('#prompt').onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey&&!state?.running){e.preventDefault();$('#chat').requestSubmit();}};
 $('#stop').onclick=()=>send({type:'stop'}).catch(error);$('#clear').onclick=()=>send({type:'clear'}).catch(error);
 $('#mode').onchange=async()=>{const {settings={}}=await chrome.storage.local.get('settings');settings.mode=$('#mode').value;await chrome.storage.local.set({settings});};
-chrome.storage.onChanged.addListener((changes,area)=>{if(area==='session'&&changes.state)render(changes.state.newValue);if(area==='local'&&changes.settings)$('#mode').value=changes.settings.newValue.mode||'ask';});
+chrome.storage.onChanged.addListener((changes,area)=>{if(area==='session'&&changes.state)render(changes.state.newValue);if(area==='local'&&changes.settings)$('#mode').value=changes.settings.newValue.mode||'auto';});
 chrome.runtime.onMessage.addListener(m=>{if(m.type==='state')render(m.state);});
-try{render(await send({type:'getState'}));const {settings={}}=await chrome.storage.local.get('settings');$('#mode').value=settings.mode||'ask';}catch(e){error(e);}
+try{render(await send({type:'getState'}));const {settings={}}=await chrome.storage.local.get('settings');$('#mode').value=settings.mode||'auto';}catch(e){error(e);}
