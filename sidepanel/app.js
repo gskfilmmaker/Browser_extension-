@@ -4,7 +4,7 @@ function node(tag,text,cls){const e=document.createElement(tag);e.textContent=te
 function render(s){state=s;$('#status').textContent=s.status;$('#status').classList.toggle('active',s.running);$('#send').disabled=s.running;$('#stop').hidden=!s.running;$('#mode').disabled=s.running;
  const box=$('#messages'),nearBottom=box.scrollHeight-box.scrollTop-box.clientHeight<90;
  if(s.messages.length){box.replaceChildren();for(const m of s.messages){if(m.role==='tool'){const d=node('details','', 'tool');d.append(node('summary',m.text),node('pre',JSON.stringify({arguments:m.args,result:m.result},null,2)));box.append(d);}else box.append(node('article',m.text||(s.running?'Thinking…':''),`message ${m.role}`));}}
- else if(!box.querySelector('.welcome'))box.replaceChildren(node('div','Start a conversation to work with your browser.','welcome'));
+ else if(!box.querySelector('.welcome'))box.replaceChildren(node('div','Start a new journey with FramePilot. What would you like to do?','welcome'));
  if(nearBottom)box.scrollTop=box.scrollHeight;
  const approval=$('#approval');approval.hidden=!s.pending;approval.replaceChildren();if(s.pending){const p=s.pending;approval.append(node('strong',`Approve ${p.name}?`),node('p',p.url),node('p',p.notice),node('pre',JSON.stringify(p.args,null,2)));for(const [label,approved]of [['Deny',false],['Approve once',true]]){const b=node('button',label);b.onclick=()=>send({type:'approve',id:p.id,approved}).catch(error);approval.append(b);}}
 }

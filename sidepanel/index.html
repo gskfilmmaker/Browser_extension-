@@ -1,1 +1,50 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AI Browser Agent</title><link rel="stylesheet" href="../ui.css"></head><body class="panel"><header><div class="brand">✦</div><div><h1>AI Browser Agent</h1><small>Your browser, with a copilot</small></div><button id="settings" class="icon" title="Open settings" aria-label="Open settings">⚙</button></header><div class="toolbar"><label for="mode">Permission mode</label><select id="mode"><option value="ask">Ask before every action</option><option value="auto">Auto with safety checks</option><option value="trusted">Trusted sites only</option></select></div><div id="status" role="status">Ready</div><main id="messages" aria-label="Conversation"><div class="welcome"><span>✦</span><h2>A little help,<br>right where you browse.</h2><p>Read a page, compare tabs, or get help with a task. You approve actions before they happen.</p></div></main><section id="approval" hidden aria-label="Action approval"></section><footer><form id="chat"><label for="prompt" class="sr-only">Message</label><textarea id="prompt" placeholder="What would you like to do?" rows="3" maxlength="16000" required></textarea><div class="composer-actions"><button type="button" id="clear" class="quiet">New chat</button><button type="button" id="stop" class="quiet" hidden>Stop</button><button type="submit" id="send">Send ↗</button></div></form><small>Page data is sent to your selected AI provider.</small></footer><script type="module" src="app.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>FramePilot</title>
+  <link rel="icon" type="image/png" href="../icons/icon-32.png">
+  <link rel="stylesheet" href="../ui.css">
+</head>
+<body class="panel">
+  <header>
+    <img class="brand" src="../brand/mark.svg" alt="" width="44" height="44">
+    <div class="brand-heading"><h1>FramePilot</h1><small>BY GSK PRODUCTIONS INC.</small></div>
+    <button id="settings" class="icon" title="Open settings" aria-label="Open settings"><img src="../brand/settings.svg" width="20" height="20" alt=""></button>
+  </header>
+  <div class="toolbar">
+    <label for="mode">Permission mode</label>
+    <select id="mode">
+      <option value="ask">Ask before every action</option>
+      <option value="auto">Auto with safety checks</option>
+      <option value="trusted">Trusted sites only</option>
+    </select>
+  </div>
+  <div id="status" role="status">Ready</div>
+  <main id="messages" aria-label="Conversation">
+    <div class="welcome">
+      <img src="../brand/mark.svg" width="64" height="64" alt="">
+      <p class="eyebrow">YOUR AI BROWSER COPILOT</p>
+      <h2>Your browser.<br>In motion.</h2>
+      <p>Read a page. Find your way. Get things done.<br>You set the direction. FramePilot helps you move.</p>
+      <div class="trust-note"><span aria-hidden="true">✓</span> You approve actions before they happen.</div>
+    </div>
+  </main>
+  <section id="approval" hidden aria-label="Action approval"></section>
+  <footer>
+    <form id="chat">
+      <label for="prompt" class="sr-only">Message FramePilot</label>
+      <textarea id="prompt" placeholder="Where should we go next?" rows="3" maxlength="16000" required></textarea>
+      <div class="composer-actions">
+        <button type="button" id="clear" class="quiet">New chat</button>
+        <button type="button" id="stop" class="quiet" hidden>Stop</button>
+        <button type="submit" id="send">Send</button>
+      </div>
+    </form>
+    <small>Page data is sent to your selected AI provider.</small>
+    <small class="developer-credit">Developed by GSK Productions Inc.</small>
+  </footer>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

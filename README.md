@@ -1,4 +1,9 @@
-# AI Browser Agent
+# FramePilot
+
+<picture><source media="(prefers-color-scheme: dark)" srcset="brand/logo-dark.png"><img src="brand/logo-light.png" alt="FramePilot — Developed by GSK Productions Inc." width="720"></picture>
+
+**Your browser. In motion.**
+Developed by **GSK Productions Inc.**
 
 A dependency-free Manifest V3 Chrome extension with a persistent side panel, OpenAI and Anthropic streaming, browser tools, and approval-first execution. Load the source folder directly; no bundler, server, or npm install is required. Requires Chrome 120+.
 
@@ -6,7 +11,7 @@ A dependency-free Manifest V3 Chrome extension with a persistent side panel, Ope
 
 1. Download and extract this project to a permanent folder.
 2. Open `chrome://extensions`, turn on **Developer mode**, choose **Load unpacked**, and select the folder containing `manifest.json`.
-3. Pin **AI Browser Agent** in the extensions menu. Click its toolbar icon to open the side panel.
+3. Pin **FramePilot** in the extensions menu. Click its toolbar icon to open the side panel.
 4. Open Settings with the gear icon. Create a provider API key at [OpenAI](https://platform.openai.com/api-keys) or [Anthropic Console](https://console.anthropic.com/). API billing is separate from ChatGPT or Claude subscriptions. Enter keys only in the extension's Settings page.
 5. Select a provider and a model available to that account, then **Save settings**. Suggested IDs are editable; provider availability changes.
 6. Open an ordinary HTTP(S) page. Ask, for example: “Read this page and summarize the key points.” Review each approval card, including its target URL and arguments, and choose **Approve once** or **Deny**.
@@ -89,3 +94,19 @@ This is an unpacked extension implementation, not a Chrome Web Store submission.
 - Native unpacked loading was blocked by the environment's managed `ExtensionInstallBlocklist` policy. Native Chrome extension API wiring and live provider requests are not verified here. The policy was not changed.
 
 The policy-compatible CDP/worker/UI test is included as `tests/cdp_test.py`; it uses Python Playwright and the system Chromium. Run `python tests/cdp_test.py`. Chrome API adapters in this test are explicitly separate from native extension integration.
+
+## Branding and version 1.1.0
+
+FramePilot is developed by GSK Productions Inc. The side panel, settings page, Chrome toolbar, manifest, and assistant identity use the FramePilot brand. Existing provider settings, API keys, and safety preferences retain their storage keys, so reloading the same unpacked extension folder keeps your configuration.
+
+The complete [brand kit](brand/README.md) includes editable SVG masters, transparent and monochrome marks, PNG wordmarks, exact-size Chrome icons, promotional tiles, and a local brand preview. [Chrome Web Store preparation notes](CHROMEWEBSTORE.md) track listing copy and remaining submission requirements. Branding assets do not change page access, approvals, or provider behavior.
+
+To update an existing local installation:
+
+```sh
+git pull origin main
+```
+
+Then open `chrome://extensions`, find the extension (formerly AI Browser Agent), and click **Reload**. Close and reopen the side panel. If you downloaded a ZIP instead, extract the updated source and reload your existing extension from the same folder.
+
+To create a small runtime-only installation ZIP, run `python scripts/package.py` (or `npm run package`). The result is `dist/framepilot-1.1.0.zip`; extract it and select its folder in **Load unpacked**. No build step is needed to load the source directly.

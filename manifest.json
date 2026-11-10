@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "AI Browser Agent",
-  "version": "1.0.0",
+  "name": "FramePilot",
+  "version": "1.1.0",
   "minimum_chrome_version": "120",
-  "description": "An approval-first browser agent for OpenAI and Anthropic.",
+  "description": "Your AI browser copilot: read pages, navigate tabs, and complete tasks with you in control. Developed by GSK Productions Inc.",
   "permissions": [
     "sidePanel",
     "storage",
@@ -19,13 +19,18 @@
     "type": "module"
   },
   "action": {
-    "default_title": "Open AI Browser Agent",
+    "default_title": "Open FramePilot",
     "default_icon": {
-      "128": "icons/128.png"
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png"
     }
   },
   "icons": {
-    "128": "icons/128.png"
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
   },
   "side_panel": {
     "default_path": "sidepanel/index.html"
@@ -33,5 +38,6 @@
   "options_page": "options/index.html",
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'; connect-src https://api.openai.com https://api.anthropic.com"
-  }
+  },
+  "author": "GSK Productions Inc."
 }
