@@ -15,23 +15,24 @@ chrome.runtime.onMessage.addListener((m,sender,reply)=>{
  (async()=>{await boot;
  switch(m.type){
  case 'getState':return state;
- case 'start':if(state.running)throw Error('An agent run is already active.');if(Date.now()-lastStart<3000)throw Error('Wait a few seconds between requests.');if(typeof m.text!=='string'||!m.text.trim()||m.text.length>16000)throw Error('Enter a request under 16,000 characters.');lastStart=Date.now();state.running=true;controller=new AbortController();run(m.text.trim()).catch(()=>{});return {ok:true};
+ case 'start':if(state.running)throw Error('An agent run is already active.');if(Date.now()-lastStart<3000)throw Error('Wait a few seconds between requests.');if(typeof m.text!=='string'||!m.text.trim()||m.text.length>16000)throw Error('Enter a request under 16,000 characters.');lastStart=Date.now();state.running=true;controller=new AbortController();const request=m.resume&&state.lastTask?`Continue the previous task: ${state.lastTask}. Reinspect the current page and prior results. Do not repeat completed actions or uncertain sends.`:m.text.trim();if(!m.resume){state.lastTask=m.text.trim();state.steps=[];}run(request,m.resume===true).catch(()=>{});return {ok:true};
  case 'approve':if(state.pending?.id!==m.id)throw Error('Approval expired.');pendingResolve?.(m.approved===true);return {ok:true};
  case 'stop':controller?.abort();pendingResolve?.(false);return {ok:true};
- case 'clear':if(state.running)throw Error('Stop the agent first.');state.messages=[];conversation=[];await chrome.storage.session.remove('conversation');await save();return {ok:true};
+ case 'clear':if(state.running)throw Error('Stop the agent first.');state.messages=[];state.steps=[];state.lastTask=null;state.taskTabId=null;conversation=[];await chrome.storage.session.remove('conversation');await save();return {ok:true};
  default:throw Error('Unknown message.');}
  })().then(reply,e=>reply({error:e.message}));return true;
 });
-async function approve(name,args,ctx,risk){
+async function approve(name,args,ctx,prepared){
+ const risk=prepared.risk;
  const id=crypto.randomUUID();let t=null;
- if(name!=='get_tabs_context'&&name!=='create_tab')t=await target(args.tabId??ctx.tabId,ctx.settings);
+ if(!['get_tabs_context','create_tab','list_files','update_task','get_download_status'].includes(name))t=await target(args.tabId??ctx.tabId,ctx.settings);
  const url=t?.url||args.url||'All permitted HTTP(S) tabs';
- state.pending={id,name,args,url,tabId:t?.id,title:t?.title,notice:risk.reason,level:risk.level};state.status='Waiting for approval';await save();
+ state.pending={id,name,args,url,tabId:t?.id,title:t?.title,notice:risk.reason,level:risk.level,review:prepared.review,files:prepared.files};state.status='Waiting for approval';await save();
  const yes=await new Promise(resolve=>{const timer=setTimeout(()=>{pendingResolve=null;resolve(false);},120000);pendingResolve=v=>{clearTimeout(timer);pendingResolve=null;resolve(v);};});
  state.pending=null;await save();if(!yes||ctx.signal.aborted){ctx.denied=true;throw Error('Action denied, expired, or stopped.');}
  if(t){const current=await target(t.id,ctx.settings);if(current.url!==url)throw Error('The page navigated after approval was requested. Please retry.');}
 }
-async function run(text){
+async function run(text,resume=false){
  const signal=controller.signal;let keepAlive;const timeout=setTimeout(()=>{controller?.abort();pendingResolve?.(false);},600000);
  try{
  // Chrome API activity keeps an active run alive; no unattended resumption after termination.
@@ -39,10 +40,11 @@ async function run(text){
  const settings={...defaults,...(await chrome.storage.local.get('settings')).settings};
  let [tab]=await chrome.tabs.query({active:true,lastFocusedWindow:true});
  if(tab?.url?.startsWith(chrome.runtime.getURL(''))){const candidates=await chrome.tabs.query({lastFocusedWindow:true});tab=candidates.filter(t=>/^https?:/.test(t.url||'')).sort((a,b)=>(b.lastAccessed||0)-(a.lastAccessed||0))[0];}
- const ctx={settings,tabId:tab?.id,signal};
+ if(resume&&state.taskTabId){try{tab=await target(state.taskTabId,settings);}catch{}}
+ const ctx={settings,tabId:tab?.id,signal,failureCounts:new Map()};state.taskTabId=ctx.tabId;
  message('user',text);state.status='Thinking';await save();
  // Checkpoints contain completed tool turns only; screenshot bytes are not retained.
- const history=[{role:'system',text:SYSTEM},...conversation,{role:'user',text:`Target tab ID: ${ctx.tabId}. User request: ${text}`}];
+ const history=[{role:'system',text:SYSTEM},...conversation,{role:'user',text:`Target tab ID: ${ctx.tabId}. Budget: up to ${Math.min(40,settings.maxSteps||35)} model rounds and 10 minutes. User request: ${text}`}];
  if(JSON.stringify(history).length>1500000)throw Error('Conversation is too long. Start a new chat.');
  const checkpoint=async()=>{conversation=history.slice(1).map(m=>m.image?{role:'tool',id:m.id,result:{screenshot:'Image from a previous turn; capture again if needed.'}}:m);await chrome.storage.session.set({conversation});};
  for(let step=0;step<Math.min(40,settings.maxSteps||20);step++){
@@ -59,12 +61,12 @@ async function run(text){
  if(call.args.url)checkURL(call.args.url,settings);
  const prepared=await prepareAction(call.name,call.args,ctx);
  const required=needsApproval(call.name,settings.mode,prepared.risk);
- if(required)await approve(call.name,call.args,ctx,prepared.risk);
+ if(required)await approve(call.name,call.args,ctx,prepared);
  ctx.authorization={signature:prepared.signature,approved:required};
  signal.throwIfAborted();state.status=`Controlling page · ${call.name}`;await chrome.action.setBadgeText({text:'RUN'});await chrome.action.setBadgeBackgroundColor({color:'#ba5429'});await save();
- result=await execute(call.name,call.args,ctx);signal.throwIfAborted();
+ result=await execute(call.name,call.args,ctx);signal.throwIfAborted();state.taskTabId=ctx.tabId;if(call.name==='update_task')state.steps=result.steps;
  item.result=result.image?{screenshot:'Captured and sent to provider',mime:result.mime}:result;
- }catch(e){if(signal.aborted||ctx.denied)throw e;result={error:e.message};item.result=result;}
+ }catch(e){if(signal.aborted||ctx.denied)throw e;result={error:e.message,recovery:'Read the page again. Use a fresh elementRef or a different approach. Do not retry uncertain sends.'};item.result=result;const key=JSON.stringify({name:call.name,args:call.args});const count=(ctx.failureCounts.get(key)||0)+1;ctx.failureCounts.set(key,count);if(count>=3)throw Error('The same action failed three times. Task paused: '+e.message);}
  history.push({role:'tool',id:call.id,...(result.image?{image:result.image}:{result})});await save();
  await chrome.action.setBadgeText({text:''});
  }

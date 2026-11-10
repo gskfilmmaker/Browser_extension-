@@ -2,6 +2,7 @@
 Development only: requires Python Playwright. No dependencies in the extension.
 Run from any directory: python scripts/render-brand.py
 """
+import os
 import asyncio
 from pathlib import Path
 from playwright.async_api import async_playwright
@@ -9,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 async def main():
     async with async_playwright() as p:
-        browser = await p.chromium.launch(executable_path='/usr/bin/chromium', headless=True, args=['--no-sandbox'])
+        browser = await p.chromium.launch(executable_path=os.environ.get('FRAMEPILOT_CHROMIUM','/usr/bin/chromium'), headless=True, args=['--no-sandbox'])
         page = await browser.new_page()
         async def render(svg, width, height, destination):
             await page.set_viewport_size({'width': width, 'height': height})

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "FramePilot",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "minimum_chrome_version": "120",
   "description": "Your AI browser copilot: read pages, navigate tabs, and complete tasks with you in control. Developed by GSK Productions Inc.",
   "permissions": [
@@ -9,7 +9,9 @@
     "storage",
     "scripting",
     "debugger",
-    "tabs"
+    "tabs",
+    "webNavigation",
+    "downloads"
   ],
   "host_permissions": [
     "<all_urls>"

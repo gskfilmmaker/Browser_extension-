@@ -27,7 +27,7 @@ test('routine search, reading, drafting and ordinary controls do not prompt',()=
  assert.equal(classifyAction('click_element',{}, {...regular,label:'Search',submit:true,search:true}).level,'routine');
 });
 test('critical controls are detected from the actual DOM even if model claims safe',()=>{
- for(const label of ['Send','Delete message','Move to trash','Buy now','Place order','Publish','Share','Change password','Sign in','Revoke access']){
+ for(const label of ['Download','Upload','Send','Delete message','Move to trash','Buy now','Place order','Publish','Share','Change password','Sign in','Revoke access']){
   assert.equal(classifyAction('click_element',{critical:false},{...regular,label}).level,'critical',label);
  }
  for(const label of ['New password','API key','Card number','Verification code'])assert.equal(classifyAction('form_input',{}, {...regular,label}).level,'critical',label);
@@ -48,3 +48,23 @@ test('provider tool history has correct roles and identifiers',()=>{const o=open
 test('OpenAI streamed tool calls assemble and serialize correctly',async()=>{const original=global.fetch;global.fetch=async(url,opts)=>{const p=JSON.parse(opts.body);assert.equal(p.tools[0].type,'function');return new Response('data: '+JSON.stringify({choices:[{delta:{tool_calls:[{index:0,id:'x',function:{name:'read_page',arguments:'{'}}]}}]})+'\n\ndata: '+JSON.stringify({choices:[{delta:{tool_calls:[{index:0,function:{arguments:'}'}}]},finish_reason:'tool_calls'}]})+'\n\n');};try{const r=await complete({...defaults,openaiKey:'test'},h.slice(0,2),new AbortController().signal,()=>{});assert.deepEqual(r.calls,[{id:'x',name:'read_page',args:{}}]);}finally{global.fetch=original;}});
 test('Anthropic streamed tool inputs assemble correctly',async()=>{const original=global.fetch;global.fetch=async(url,opts)=>{const p=JSON.parse(opts.body);assert.equal(p.system,'safe');assert.ok(p.tools[0].input_schema);return new Response([{type:'content_block_start',index:0,content_block:{type:'tool_use',id:'x',name:'read_page'}},{type:'content_block_delta',index:0,delta:{type:'input_json_delta',partial_json:'{}'}},{type:'message_delta',delta:{stop_reason:'tool_use'}}].map(e=>'data: '+JSON.stringify(e)+'\n\n').join(''));};try{const r=await complete({...defaults,provider:'anthropic',anthropicKey:'test'},h.slice(0,2),new AbortController().signal,()=>{});assert.equal(r.calls[0].name,'read_page');}finally{global.fetch=original;}});
 test('partial streams and HTTP failures never silently succeed',async()=>{const original=global.fetch;try{global.fetch=async()=>new Response('data: {"choices":[{"delta":{"content":"partial"}}]}\n\n');await assert.rejects(complete({...defaults,openaiKey:'test'},h.slice(0,2),new AbortController().signal,()=>{}),/before completion/);global.fetch=async()=>new Response('',{status:429,headers:{'retry-after':'10'}});await assert.rejects(complete({...defaults,openaiKey:'test'},h.slice(0,2),new AbortController().signal,()=>{}),/429/);}finally{global.fetch=original;}});
+
+test('keyboard shortcuts normalize Mac and Windows modifiers and prevent hidden sends',async()=>{
+ const {keyEvent}=await import('../lib/keyboard.js');
+ assert.equal(keyEvent('Primary+A','mac').modifiers,4);assert.equal(keyEvent('Primary+A','win').modifiers,2);
+ assert.equal(keyEvent('Shift+Tab').modifiers,8);assert.equal(keyEvent('Enter').windowsVirtualKeyCode,13);
+ assert.throws(()=>keyEvent('Meta+Enter'),/disabled/);assert.throws(()=>keyEvent('Control+Enter'),/disabled/);
+ assert.throws(()=>keyEvent('A'),/type_text/);assert.throws(()=>keyEvent('Bogus+Tab'),/modifier/);
+});
+test('new tool validation rejects malformed selectors, frames, file requests and task plans',()=>{
+ assert.throws(()=>validateArgs('read_page',{frameId:-1}));assert.throws(()=>validateArgs('select_option',{selector:'#a'}));
+ assert.throws(()=>validateArgs('set_checked',{selector:'#a',checked:'true'}));assert.throws(()=>validateArgs('attach_files',{selector:'#upload',fileIds:[]}));
+ assert.throws(()=>validateArgs('update_task',{steps:[{text:'Do work',status:'invented'}]}));
+ validateArgs('form_input',{elementRef:'snapshot:1',text:'hello'});validateArgs('select_option',{role:'combobox',name:'Category',value:'b'});
+});
+test('file transmission and email always require approval; keyboard navigation stays routine',()=>{
+ for(const tool of ['send_email','attach_files','download_file'])assert.equal(classifyAction(tool,{},regular).level,'critical');
+ for(const key of ['Tab','Escape','ArrowDown','Primary+A'])assert.equal(classifyAction('press_key',{key},{...regular,editable:true}).level,'routine');
+ assert.equal(classifyAction('press_key',{key:'Delete'},{...regular,editable:false}).level,'critical');
+ assert.equal(classifyAction('press_key',{key:'Enter'},{...regular,label:'Send'}).level,'critical');
+});

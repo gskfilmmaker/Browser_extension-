@@ -1,3 +1,4 @@
+import os
 import asyncio,json,threading
 from pathlib import Path
 from http.server import ThreadingHTTPServer,SimpleHTTPRequestHandler
@@ -13,12 +14,11 @@ class Handler(SimpleHTTPRequestHandler):
 server=ThreadingHTTPServer(('127.0.0.1',0),Handler);threading.Thread(target=server.serve_forever,daemon=True).start()
 async def main():
  async with async_playwright() as p:
-  b=await p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox']);c=await b.new_context();fixture=await c.new_page();base=f'http://127.0.0.1:{server.server_port}';await fixture.goto(base+'/fixture');cdp=await c.new_cdp_session(fixture)
+  b=await p.chromium.launch(executable_path=os.environ.get('FRAMEPILOT_CHROMIUM','/usr/bin/chromium'),headless=True,args=['--no-sandbox']);c=await b.new_context();fixture=await c.new_page();base=f'http://127.0.0.1:{server.server_port}';await fixture.goto(base+'/fixture');cdp=await c.new_cdp_session(fixture)
   harness=await c.new_page();await harness.goto(base+'/options/index.html')
   await harness.expose_function('cdpCommand',lambda method,params:cdp.send(method,params))
-  await harness.expose_function('inspectPage',lambda source,a,name:fixture.evaluate('([source,a,name])=>('+source+')(a,name)',[source,a,name]))
-  await harness.expose_function('extractPage',lambda:fixture.evaluate((root/'content/extract.js').read_text()))
-  await harness.evaluate("""(base)=>{globalThis.chrome={runtime:{getPlatformInfo:async()=>({os:'linux'})},debugger:{onDetach:{addListener(){}},onEvent:{addListener(){}},attach:async()=>{},detach:async()=>{},sendCommand:async(_t,m,p)=>cdpCommand(m,p)},tabs:{get:async id=>({id,url:base+'/fixture'}),query:async()=>[{id:1,url:base+'/fixture',title:'Agent fixture'}]},scripting:{executeScript:async spec=>[{result:spec.func?await inspectPage(spec.func.toString(),...spec.args):await extractPage()}]}};}""",base)
+  await harness.expose_function('executePage',lambda source,args,frameId:(fixture.frames[frameId] if frameId else fixture.main_frame).evaluate('([source,args])=>('+source+')(...args)',[source,args]))
+  await harness.evaluate("""(base)=>{globalThis.chrome={runtime:{getPlatformInfo:async()=>({os:'linux'})},debugger:{onDetach:{addListener(){}},onEvent:{addListener(){}},attach:async()=>{},detach:async()=>{},sendCommand:async(_t,m,p)=>cdpCommand(m,p)},tabs:{get:async id=>({id,url:base+'/fixture'}),query:async()=>[{id:1,url:base+'/fixture',title:'Agent fixture'}]},scripting:{executeScript:async spec=>[{result:await executePage(spec.func.toString(),spec.args||[],spec.target?.frameIds?.[0]||0)}]}};}""",base)
   result=await harness.evaluate("""async()=>{const {execute,detachAll}=await import('/lib/browser.js');const {defaults}=await import('/lib/policy.js');const ctx={tabId:1,settings:defaults,signal:new AbortController().signal};const page=await execute('read_page',{},ctx);const ax=await execute('get_accessibility_tree',{},ctx);await execute('form_input',{selector:'#name',text:'Browser agent'},ctx);await execute('click_element',{selector:'#go'},ctx);const image=await execute('take_screenshot',{},ctx);const wait=await execute('wait_for_element',{selector:'#result'},ctx);await execute('scroll',{y:20},ctx);await detachAll();return {page:page.text,ax:ax.nodes.length,screenshot:!!image.image,wait};}""")
   assert 'Browser fixture' in result['page'];assert result['ax']>0;assert result['screenshot'];assert await fixture.locator('#name').input_value()=='Browser agent';assert await fixture.locator('#result').inner_text()=='Clicked'
   # Run the actual service-worker agent loop with Chrome API adapters and real CDP tools.

@@ -1,3 +1,4 @@
+import os
 import asyncio, tempfile, json, threading
 from pathlib import Path
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -10,7 +11,7 @@ server=HTTPServer(('127.0.0.1',0),Handler);threading.Thread(target=server.serve_
 async def main():
  async with async_playwright() as p:
   ext=str(Path(__file__).resolve().parents[1])
-  context=await p.chromium.launch_persistent_context(tempfile.mkdtemp(),executable_path='/usr/bin/chromium',headless=True,ignore_default_args=['--disable-extensions'],args=[f'--disable-extensions-except={ext}',f'--load-extension={ext}','--no-sandbox','--enable-unsafe-extension-debugging','--disable-features=DisableLoadExtensionCommandLineSwitch'])
+  context=await p.chromium.launch_persistent_context(tempfile.mkdtemp(),executable_path=os.environ.get('FRAMEPILOT_CHROMIUM','/usr/bin/chromium'),headless=True,ignore_default_args=['--disable-extensions'],args=[f'--disable-extensions-except={ext}',f'--load-extension={ext}','--no-sandbox','--enable-unsafe-extension-debugging','--disable-features=DisableLoadExtensionCommandLineSwitch'])
   # New Chromium versions support explicit unpacked loading via CDP. Managed policy may reject it.
   if not context.service_workers:
    session=await context.browser.new_browser_cdp_session()

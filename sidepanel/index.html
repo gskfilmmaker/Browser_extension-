@@ -33,10 +33,12 @@
   </main>
   <section id="approval" hidden aria-label="Action approval"></section>
   <footer>
+    <div id="files" aria-label="Selected files"></div><input type="file" id="file-picker" multiple hidden>
     <form id="chat">
       <label for="prompt" class="sr-only">Message FramePilot</label>
       <textarea id="prompt" placeholder="Where should we go next?" rows="3" maxlength="16000" required></textarea>
       <div class="composer-actions">
+        <button type="button" id="choose-files" class="quiet" title="Select local files for an attachment">Files</button><button type="button" id="resume" class="quiet" hidden>Continue task</button>
         <button type="button" id="clear" class="quiet">New chat</button>
         <button type="button" id="stop" class="quiet" hidden>Stop</button>
         <button type="submit" id="send">Send</button>

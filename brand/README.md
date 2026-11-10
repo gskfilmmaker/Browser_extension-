@@ -19,6 +19,7 @@ The mark pairs a four-corner viewfinder frame with an amber forward triangle. Th
 | `promo-small.svg` / `.png` | 440×280 promotional tile |
 | `promo-marquee.svg` / `.png` | 1400×560 promotional banner |
 | `framepilot-artwork.png` | AI-generated supplemental cinematic brand artwork; not the icon master |
+| `email-review-preview.png` | Reviewed-email UI rendered with a controlled fixture and a test runtime adapter |
 | `ui-preview.png` | Branded side panel rendered with a test runtime adapter |
 | `preview.html` | Local brand gallery; open directly in your browser |
 | `../icons/icon-*.png` | Exact 16, 32, 48, and 128px PNGs for Chrome |
