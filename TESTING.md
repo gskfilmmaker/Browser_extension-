@@ -1,4 +1,4 @@
-# FramePilot 1.4.1 personal acceptance tests
+# FramePilot 1.4.2 personal acceptance tests
 
 This release has passed controlled Chromium/CDP tests, including a mocked-provider email loop. It has not been verified in your authenticated Gmail/Outlook accounts. Use this checklist on your Mac before trusting important workflows. Start with a test account, test messages, and a recipient you control.
 
@@ -10,7 +10,7 @@ git pull origin main
 open -a "Google Chrome" "chrome://extensions/"
 ```
 
-Reload FramePilot, check version 1.4.1, reopen the side panel, and review any Chrome permission changes. Keep Automatic mode for routine steps. Your API key should remain saved. Test with a normal web tab active. Chrome-internal pages are not supported. Close other debugging tools if debugger attachment fails.
+Reload FramePilot, check version 1.4.2, reopen the side panel, and review any Chrome permission changes. Keep Automatic mode for routine steps. Your API key should remain saved. Test with a normal web tab active. Chrome-internal pages are not supported. Close other debugging tools if debugger attachment fails.
 
 ## Test matrix
 
@@ -61,3 +61,7 @@ A native installed-extension test, current live Drive download variants and curr
 - With a stalled job, request `diagnose_upload_job`. It must report observed conditions rather than claim creating the job starts a download or that all manual downloads are forbidden. A matching manual download begun during approval can become ready; a preapproval download stays excluded with a reason.
 - Provider unit tests mock 429 responses, verify backoff respects Retry-After, unchanged request content, bounded retries, quota errors without retries, privacy of error bodies, and cancellation. Existing partial-stream tests must continue to fail without replaying tools.
 - On a real transient 429 the panel should display retry number/wait. Stop must cancel. An insufficient-quota error must identify billing/project quota and stop instead of waiting. Do not deliberately exhaust paid API quota to test this; mocks cover the branches without charges.
+
+## 1.4.2 upload detection regression
+
+Run `python tests/transfers_test.py` and `FRAMEPILOT_UPLOAD_SHADOW=closed python tests/transfers_test.py`. Both use real Chromium/CDP with a controlled uploader. They pass a mistaken dialog locator, require unique browser-side hidden-file-input discovery, assign a real 40 MB file, and verify FileList size. The closed variant puts the actual input in a closed shadow root that the isolated page resolver cannot traverse. Multiple compatible inputs must fail before any attachment event. These are synthetic layouts, not evidence of authenticated YouTube Studio testing.

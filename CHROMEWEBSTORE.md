@@ -1,7 +1,7 @@
 # Chrome Web Store Listing — FramePilot
 
 > Last Updated: 2026-11-16
-> Version 1.4.1 · Draft, not submitted or published.
+> Version 1.4.2 · Draft, not submitted or published.
 
 ## Store Listing
 
@@ -110,6 +110,7 @@ The store developer account's displayed publisher identity is configured in the 
 
 | Version | Date | Changes | Status |
 | --- | --- | --- | --- |
+| 1.4.2 | 2026-11-16 | Browser-side discovery of unique compatible hidden upload inputs, including closed shadow roots; clearer missing/ambiguous-input errors. No new permissions. | Draft; live Studio layout unverified |
 | 1.4.1 | 2026-11-16 | Transfer diagnostics, corrected manual-download guidance, bounded rate-limit recovery and specific provider error codes. No new permissions. | Draft; live Google workflow unverified |
 | 1.4.0 | 2026-11-16 | Persistent scoped transfer jobs, large downloaded-file assignment, transfer continuation and actual YouTube metadata review before final saving. | Draft; live Google workflow unverified |
 | 1.3.0 | 2026-11-10 | Expanded input, snapshot references, frames, selected files, downloads, task progress/continuation, reviewed email with attempt ledger and fresh confirmation. | Draft |
@@ -132,3 +133,7 @@ The bridge has a controlled 40 MB Chromium download/file-assignment test. Live a
 ### Version 1.4.1 disclosure additions
 
 Stalled-transfer diagnostics inspect at most 100 recent Chrome download records, compare only the job's filenames and source constraints, and report matching-file rejection reasons. Unrelated history and native paths are omitted. No new permissions or persistent data categories are added. Matching manual downloads during the reviewed window are eligible; creating a job alone does not start a download, and downloads remain on disk. Rejected rate-limited provider requests may be retried at most three times with bounded waits; quota errors and partial streams are not automatically retried. Actual provider usage and billing terms still apply. Retry status appears in the panel; screenshots should be refreshed before submission.
+
+### Version 1.4.2 review notes
+
+The existing debugger permission also discovers and verifies actual file inputs including closed shadow roots in the top document. Child documents are excluded. Only registered downloads may be assigned; model-supplied native paths are not accepted. Ambiguous, disabled, detached, incompatible and missing inputs fail before assignment. Current document and input properties are checked again, and FileList verification distinguishes attachment from website upload/publication. No new permissions, storage categories or network recipients are added. Controlled tests cover ordinary and closed-shadow uploaders, not a real signed-in Studio session.

@@ -6,7 +6,7 @@
 
 Developed by **GSK Productions Inc.**
 
-FramePilot is a Manifest V3 browser agent with a persistent side panel, streaming OpenAI/Anthropic support, automatic routine interactions, and confirmation for detected critical actions. Version 1.4.1 adds transfer diagnostics and bounded provider rate-limit retries. Version 1.4 adds persistent, reviewed download-to-upload jobs for large videos, direct downloaded-file attachment, resumable transfer tracking, and a final YouTube metadata review. Keyboard controls, frames, forms, selected-file attachments and reviewed email remain available.
+FramePilot is a Manifest V3 browser agent with a persistent side panel, streaming OpenAI/Anthropic support, automatic routine interactions, and confirmation for detected critical actions. Version 1.4.2 improves hidden upload-input discovery and reports page-script failures accurately. Version 1.4.1 adds transfer diagnostics and bounded provider rate-limit retries. Version 1.4 adds persistent, reviewed download-to-upload jobs for large videos, direct downloaded-file attachment, resumable transfer tracking, and a final YouTube metadata review. Keyboard controls, frames, forms, selected-file attachments and reviewed email remain available.
 
 This is a development release. Controlled Chromium tests cover the engine and a complete email-composer workflow. Live Gmail/Outlook accounts, live provider requests, and native extension integration require validation on your computer. It does not promise compatibility with every website or parity with another commercial browser agent.
 
@@ -29,7 +29,7 @@ cd ~/Downloads/FramePilot
 git pull origin main
 ```
 
-Open `chrome://extensions`, click **Reload** on FramePilot, and close/reopen its side panel. Check version **1.4.1**. This update adds no permissions beyond 1.3; older installations may show permission information for `webNavigation` and `downloads`. Keys, model choices, and your selected permission mode keep their existing storage keys. A fresh installation defaults to automatic mode; the one-time 1.2 migration is not repeated on already-migrated settings.
+Open `chrome://extensions`, click **Reload** on FramePilot, and close/reopen its side panel. Check version **1.4.2**. This update adds no permissions beyond 1.3; older installations may show permission information for `webNavigation` and `downloads`. Keys, model choices, and your selected permission mode keep their existing storage keys. A fresh installation defaults to automatic mode; the one-time 1.2 migration is not repeated on already-migrated settings.
 
 ## First tasks to try
 
@@ -178,3 +178,9 @@ Creating a transfer job records authorization; it does **not** itself download a
 Ask: “Inspect my existing upload jobs and run diagnose_upload_job for each stalled job. Report its observed reasons. If the grant is active and no download started, inspect the source file and actually invoke Download. Do not create duplicate jobs or repeat uncertain uploads.”
 
 Diagnostics distinguish missing downloads, preapproval files, expired windows/grants, closed/changed tabs, filename/source/file-ID mismatch, interrupted downloads and HTML/unsafe files. They inspect at most 100 recent Chrome records in the last day before the job onward, returning only job-related reasons and names. They do not scan disk, show native paths or expose unrelated download history. A cause such as pop-up blocking cannot be inferred merely from a waiting status. Downloaded media remains on your disk; this is not a disk-free cloud-to-cloud API transfer.
+
+## Upload dialog open but file input not found
+
+Use `attach_downloads` with the existing `jobId` and ready download IDs, without an element locator. The visible Select files button and the dialog itself are not file inputs. Starting in 1.4.2, FramePilot uses Chrome's DOM inspection to find a unique compatible top-frame input, including hidden controls inside closed shadow roots. It revalidates the input and document before assignment, reads back the actual FileList, and never accepts a model-supplied disk path. It does not open the native file chooser.
+
+Multiple compatible inputs, disabled controls, child-frame-only controls, changed documents, or no matching inputs produce a diagnostic rather than a blind assignment. A visible button/dialog locator may recover only when browser inspection finds exactly one eligible input. This fallback is limited to the upload bridge; general page reading still traverses open shadow roots only. A consumed/reset input remains uncertain and must not be attached again automatically. Current live Studio compatibility still needs verification on your computer.

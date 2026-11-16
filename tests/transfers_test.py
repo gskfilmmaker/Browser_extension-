@@ -30,6 +30,11 @@ DEST='''<html><title>Studio test destination</title><body><div id="channel-name"
 <label><input type="radio" name="audience" value="yes_mfk">Yes, made for kids</label><label><input type="radio" name="audience" value="not_mfk" checked>No, not made for kids</label>
 <p id="progress">Waiting for files</p><button id="save" type="button"><span id="save-label">Save</span></button></div><p role="status" id="saved"></p>
 <script>window.attachCount=0;window.saveCount=0;document.querySelector('#upload').onchange=e=>{attachCount++;document.querySelector('#original-filename').textContent=e.target.files[0].name;document.querySelector('#progress').textContent='Upload complete. Checks complete.';};document.querySelector('#save').onclick=()=>{saveCount++;document.querySelector('#saved').textContent='Changes saved';};</script></body></html>'''
+# Exercise the same real-CDP workflow with an upload input inaccessible to page scripts.
+if os.environ.get('FRAMEPILOT_UPLOAD_SHADOW')=='closed':
+ DEST=DEST.replace('</script>',"window.testUploadInput=document.querySelector('#upload');const host=document.createElement('div');document.body.append(host);host.attachShadow({mode:'closed'}).append(testUploadInput);</script>")
+else:
+ DEST=DEST.replace('</script>',"window.testUploadInput=document.querySelector('#upload');</script>")
 async def main():
  server=ThreadingHTTPServer(('127.0.0.1',0),Handler);threading.Thread(target=server.serve_forever,daemon=True).start()
  try:
@@ -70,10 +75,18 @@ async def main():
     unrelated=await harness.evaluate("async id=>{try{await act('resume_transfer_download',{jobId:id,downloadId:999},true);return '';}catch(e){return e.message;}}",jobId)
     assert 'registered' in unrelated
     await harness.evaluate("async()=>{items[0].state='complete';await transfers.captureDownload(items[0]);}")
-    attached=await harness.evaluate("id=>act('attach_downloads',{jobId:id})",jobId)
+    # Multiple compatible inputs must not cause a blind assignment.
+    await destination.evaluate("()=>{const e=document.createElement('input');e.id='ambiguous-upload';e.type='file';e.accept='video/*';e.multiple=true;e.hidden=true;document.body.append(e);}")
+    ambiguous=await harness.evaluate("async id=>{try{await act('attach_downloads',{jobId:id});return '';}catch(e){return e.message;}}",jobId)
+    assert '2 compatible' in ambiguous,ambiguous
+    assert await destination.evaluate('attachCount')==0
+    await destination.locator('#ambiguous-upload').evaluate('(e)=>e.remove()')
+    # The visible dialog is a mistaken locator, not an input. The browser fallback
+    # must resolve a unique actual hidden input, including a closed shadow root.
+    attached=await harness.evaluate("id=>act('attach_downloads',{jobId:id,selector:'[role=dialog]'})",jobId)
     assert attached['status']=='attached',attached
     assert await destination.evaluate('attachCount')==1
-    assert await destination.locator('#upload').evaluate('(e)=>e.files[0].size')==40*1024*1024
+    assert await destination.evaluate('testUploadInput.files[0].size')==40*1024*1024
     again=await harness.evaluate("id=>act('attach_downloads',{jobId:id})",jobId);assert again['status']=='already-attached'
     assert await destination.evaluate('attachCount')==1
     # Restarting the browser session requires reauthorization; metadata and files remain.
@@ -113,7 +126,7 @@ async def main():
     await harness.evaluate("id=>act('cancel_upload_job',{jobId:id})",jobId)
     cancelled=await harness.evaluate("async id=>{try{await act('attach_downloads',{jobId:id});return '';}catch(e){return e.message;}}",jobId);assert 'revoked' in cancelled
     assert (Path(temp)/'first.mp4').exists()
-    print(json.dumps({'passed':['one batch approval','source-scoped download clicks','real 40 MB download','persistent metadata without paths in model output','real CDP file assignment without base64','no duplicate attachment','registered interrupted download resume','restart requires renewed approval','resume preserves attachment state','actual Studio metadata/audience/visibility inspection','raw final Save bypass blocked','changed metadata rejection','fresh save confirmation','duplicate finalization blocked','revocation without deleting disk files']},indent=2))
+    print(json.dumps({'passed':['one batch approval','source-scoped download clicks','real 40 MB download','persistent metadata without paths in model output','real CDP file assignment without base64','mistaken dialog locator recovery','ambiguous inputs rejected','no duplicate attachment','registered interrupted download resume','restart requires renewed approval','resume preserves attachment state','actual Studio metadata/audience/visibility inspection','raw final Save bypass blocked','changed metadata rejection','fresh save confirmation','duplicate finalization blocked','revocation without deleting disk files']},indent=2))
     await harness.evaluate('()=>api.detachAll()');await browser.close()
  finally:server.shutdown()
 if __name__=='__main__':asyncio.run(main())
