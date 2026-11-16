@@ -28,7 +28,7 @@ chrome.runtime.onMessage.addListener((m,sender,reply)=>{
 async function approve(name,args,ctx,prepared){
  const risk=prepared.risk;
  const id=crypto.randomUUID();let t=null;
- if(!['get_tabs_context','create_tab','list_files','update_task','get_download_status','create_upload_job','resume_upload_job','list_upload_jobs','get_upload_job','wait_for_transfer','cancel_upload_job','resume_transfer_download'].includes(name))t=await target(prepared.targetTabId??args.tabId??ctx.tabId,ctx.settings);
+ if(!['get_tabs_context','create_tab','list_files','update_task','get_download_status','create_upload_job','resume_upload_job','list_upload_jobs','get_upload_job','wait_for_transfer','cancel_upload_job','resume_transfer_download','diagnose_upload_job'].includes(name))t=await target(prepared.targetTabId??args.tabId??ctx.tabId,ctx.settings);
  const url=t?.url||args.url||'All permitted HTTP(S) tabs';
  state.pending={id,name,args,url,tabId:t?.id,title:t?.title,notice:risk.reason,level:risk.level,review:prepared.review,files:prepared.files?.map(({localPath,originalURL,finalURL,...f})=>f),transferReview:prepared.transferReview,videoReview:prepared.videoReview};state.status='Waiting for approval';await save();
  const yes=await new Promise(resolve=>{const timer=setTimeout(()=>{pendingResolve=null;resolve(false);},120000);pendingResolve=v=>{clearTimeout(timer);pendingResolve=null;resolve(v);};});
@@ -52,7 +52,7 @@ async function run(text,resume=false){
  const checkpoint=async()=>{conversation=history.slice(1).map(m=>m.image?{role:'tool',id:m.id,result:{screenshot:'Image from a previous turn; capture again if needed.'}}:m);await chrome.storage.session.set({conversation});};
  for(let step=0;step<Math.min(120,ctx.mediaJobId?Math.max(settings.maxSteps||60,settings.mediaMaxSteps||80):(settings.maxSteps||60));step++){
  signal.throwIfAborted();state.status='Thinking';const m=message('assistant','');await save();let scheduled=false;
- const answer=await complete(settings,history,signal,delta=>{m.text+=delta;if(!scheduled){scheduled=true;setTimeout(()=>{scheduled=false;save().catch(()=>{});},80);}});
+ const answer=await complete(settings,history,signal,delta=>{m.text+=delta;if(!scheduled){scheduled=true;setTimeout(()=>{scheduled=false;save().catch(()=>{});},80);}},async retry=>{state.status=`Rate limited · retry ${retry.attempt}/3 in ${Math.ceil(retry.delay/1000)}s`;await save();});
  m.text=answer.text;history.push({role:'assistant',text:answer.text,calls:answer.calls});await save();
  if(!answer.calls.length){await checkpoint();state.status='Done';return;}
  if(answer.calls.length>8)throw Error('Too many tool calls in a single response.');

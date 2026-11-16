@@ -1,4 +1,4 @@
-# FramePilot 1.4 personal acceptance tests
+# FramePilot 1.4.1 personal acceptance tests
 
 This release has passed controlled Chromium/CDP tests, including a mocked-provider email loop. It has not been verified in your authenticated Gmail/Outlook accounts. Use this checklist on your Mac before trusting important workflows. Start with a test account, test messages, and a recipient you control.
 
@@ -10,7 +10,7 @@ git pull origin main
 open -a "Google Chrome" "chrome://extensions/"
 ```
 
-Reload FramePilot, check version 1.4.0, reopen the side panel, and review any Chrome permission changes. Keep Automatic mode for routine steps. Your API key should remain saved. Test with a normal web tab active. Chrome-internal pages are not supported. Close other debugging tools if debugger attachment fails.
+Reload FramePilot, check version 1.4.1, reopen the side panel, and review any Chrome permission changes. Keep Automatic mode for routine steps. Your API key should remain saved. Test with a normal web tab active. Chrome-internal pages are not supported. Close other debugging tools if debugger attachment fails.
 
 ## Test matrix
 
@@ -55,3 +55,9 @@ On your Mac, test one disposable video first:
 7. Forget the job: its local registry disappears, but downloaded files remain on disk. Delete those separately if needed.
 
 A native installed-extension test, current live Drive download variants and current live YouTube Studio remain required. Do not describe the whole workflow as verified until these pass in your Chrome profile. Test Gmail/Outlook independently; this media update does not establish live email compatibility.
+
+## 1.4.1 diagnostics and provider recovery
+
+- With a stalled job, request `diagnose_upload_job`. It must report observed conditions rather than claim creating the job starts a download or that all manual downloads are forbidden. A matching manual download begun during approval can become ready; a preapproval download stays excluded with a reason.
+- Provider unit tests mock 429 responses, verify backoff respects Retry-After, unchanged request content, bounded retries, quota errors without retries, privacy of error bodies, and cancellation. Existing partial-stream tests must continue to fail without replaying tools.
+- On a real transient 429 the panel should display retry number/wait. Stop must cancel. An insufficient-quota error must identify billing/project quota and stop instead of waiting. Do not deliberately exhaust paid API quota to test this; mocks cover the branches without charges.

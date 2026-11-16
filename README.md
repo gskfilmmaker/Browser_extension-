@@ -6,7 +6,7 @@
 
 Developed by **GSK Productions Inc.**
 
-FramePilot is a Manifest V3 browser agent with a persistent side panel, streaming OpenAI/Anthropic support, automatic routine interactions, and confirmation for detected critical actions. Version 1.4 adds persistent, reviewed download-to-upload jobs for large videos, direct downloaded-file attachment, resumable transfer tracking, and a final YouTube metadata review. Keyboard controls, frames, forms, selected-file attachments and reviewed email remain available.
+FramePilot is a Manifest V3 browser agent with a persistent side panel, streaming OpenAI/Anthropic support, automatic routine interactions, and confirmation for detected critical actions. Version 1.4.1 adds transfer diagnostics and bounded provider rate-limit retries. Version 1.4 adds persistent, reviewed download-to-upload jobs for large videos, direct downloaded-file attachment, resumable transfer tracking, and a final YouTube metadata review. Keyboard controls, frames, forms, selected-file attachments and reviewed email remain available.
 
 This is a development release. Controlled Chromium tests cover the engine and a complete email-composer workflow. Live Gmail/Outlook accounts, live provider requests, and native extension integration require validation on your computer. It does not promise compatibility with every website or parity with another commercial browser agent.
 
@@ -29,7 +29,7 @@ cd ~/Downloads/FramePilot
 git pull origin main
 ```
 
-Open `chrome://extensions`, click **Reload** on FramePilot, and close/reopen its side panel. Check version **1.4.0**. This update adds no permissions beyond 1.3; older installations may show permission information for `webNavigation` and `downloads`. Keys, model choices, and your selected permission mode keep their existing storage keys. A fresh installation defaults to automatic mode; the one-time 1.2 migration is not repeated on already-migrated settings.
+Open `chrome://extensions`, click **Reload** on FramePilot, and close/reopen its side panel. Check version **1.4.1**. This update adds no permissions beyond 1.3; older installations may show permission information for `webNavigation` and `downloads`. Keys, model choices, and your selected permission mode keep their existing storage keys. A fresh installation defaults to automatic mode; the one-time 1.2 migration is not repeated on already-migrated settings.
 
 ## First tasks to try
 
@@ -113,7 +113,7 @@ Before the final Studio Save/Publish action, FramePilot inspects the actual chan
 
 No Google Cloud project, Google API key or separate OAuth setup is needed for this browser path. Your normal website sign-ins and OpenAI/Anthropic API configuration are used. Drive/Studio authenticated end-to-end operation has **not** been verified in this development environment.
 
-New tools: `create_upload_job`, `resume_upload_job`, `list_upload_jobs`, `get_upload_job`, `wait_for_transfer`, `resume_transfer_download`, `attach_downloads`, `inspect_youtube_upload`, `finalize_youtube_upload`, `cancel_upload_job`.
+New tools: `create_upload_job`, `resume_upload_job`, `list_upload_jobs`, `get_upload_job`, `wait_for_transfer`, `resume_transfer_download`, `attach_downloads`, `inspect_youtube_upload`, `finalize_youtube_upload`, `cancel_upload_job`, `diagnose_upload_job`.
 
 ## Data and storage
 
@@ -134,7 +134,7 @@ Page text, screenshots, accessibility names, task prompts, email drafts, selecte
 - `lib/policy.js`, `lib/action-risk.js`, `lib/tools.js`: validation, permissions, classification and tool schemas.
 - `sidepanel/`, `options/`, `ui.css`: local interface; no build required.
 
-One run executes at a time; requests are spaced by three seconds. Fresh settings default to 60 model rounds; reviewed media tasks use at least the configured media allowance (default 80). Both are capped at 120 and saved generic limits are preserved. Longer tasks incur more provider charges; the batch review displays its allowance. Runs are limited to 30 minutes. Provider errors and incomplete streams are reported, not silently retried. HTTP 429 exposes Retry-After when supplied. Three identical tool failures stop the run. Browser worker termination requires explicit user continuation; critical operations never resume unattended. Debugger attachment is detached when a run ends. Other debugging extensions or DevTools can conflict.
+One run executes at a time; requests are spaced by three seconds. Fresh settings default to 60 model rounds; reviewed media tasks use at least the configured media allowance (default 80). Both are capped at 120 and saved generic limits are preserved. Longer tasks incur more provider charges; the batch review displays its allowance. Runs are limited to 30 minutes. Rejected HTTP 429 rate-limit requests are retried up to three times with exponential backoff, jitter and Retry-After (seconds or HTTP date). A single wait over 60 seconds or total wait over 120 seconds stops instead. The panel shows retry state and Stop interrupts waiting. Only the provider request is retried, with unchanged history; completed browser tools are not replayed. Quota/billing errors, other HTTP errors, network failures, and accepted/partial streams are never automatically retried. Error messages show validated provider code/type and a specific remedy without echoing raw provider error bodies. Three identical tool failures stop the run. Browser worker termination requires explicit user continuation; critical operations never resume unattended. Debugger attachment is detached when a run ends. Other debugging extensions or DevTools can conflict.
 
 ## Validation
 
@@ -170,3 +170,11 @@ The CDP suites use explicit Chrome API adapters backed by a real controlled brow
 `python scripts/package.py` creates `dist/framepilot-1.3.0.zip` containing only runtime files. Extract it before using **Load unpacked**. The [brand kit](brand/README.md) includes vector masters, PNG icons and promotional assets; `python scripts/render-brand.py` regenerates vector exports. [Chrome Web Store notes](CHROMEWEBSTORE.md) track submission requirements.
 
 Scheduling, recorded/reusable workflows, desktop companion control, vendor-native browser toolsets, Gmail/Graph connectors, subscription billing, unrestricted local files and guaranteed universal website support are not included. These are subsequent projects, not hidden features. Before broad distribution, verify native installation and live accounts, review security, publish an accurate privacy policy, capture authentic store screenshots, and complete publisher details.
+
+## When a transfer stays waiting
+
+Creating a transfer job records authorization; it does **not** itself download anything or guarantee a Chrome prompt. The agent must invoke the signed-in source page’s Download control. Normal Chrome downloads may be silent. Manual downloads can be detected if they match the job’s filename, source evidence, file ID when supplied, and approval capture window; they need not have been initiated by the extension. Files downloaded before approval are not automatically authorized. This is a FramePilot scope rule, not a claim that Chrome universally forbids attaching manually downloaded files.
+
+Ask: “Inspect my existing upload jobs and run diagnose_upload_job for each stalled job. Report its observed reasons. If the grant is active and no download started, inspect the source file and actually invoke Download. Do not create duplicate jobs or repeat uncertain uploads.”
+
+Diagnostics distinguish missing downloads, preapproval files, expired windows/grants, closed/changed tabs, filename/source/file-ID mismatch, interrupted downloads and HTML/unsafe files. They inspect at most 100 recent Chrome records in the last day before the job onward, returning only job-related reasons and names. They do not scan disk, show native paths or expose unrelated download history. A cause such as pop-up blocking cannot be inferred merely from a waiting status. Downloaded media remains on your disk; this is not a disk-free cloud-to-cloud API transfer.

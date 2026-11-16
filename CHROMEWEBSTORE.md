@@ -1,7 +1,7 @@
 # Chrome Web Store Listing — FramePilot
 
 > Last Updated: 2026-11-16
-> Version 1.4.0 · Draft, not submitted or published.
+> Version 1.4.1 · Draft, not submitted or published.
 
 ## Store Listing
 
@@ -110,6 +110,7 @@ The store developer account's displayed publisher identity is configured in the 
 
 | Version | Date | Changes | Status |
 | --- | --- | --- | --- |
+| 1.4.1 | 2026-11-16 | Transfer diagnostics, corrected manual-download guidance, bounded rate-limit recovery and specific provider error codes. No new permissions. | Draft; live Google workflow unverified |
 | 1.4.0 | 2026-11-16 | Persistent scoped transfer jobs, large downloaded-file assignment, transfer continuation and actual YouTube metadata review before final saving. | Draft; live Google workflow unverified |
 | 1.3.0 | 2026-11-10 | Expanded input, snapshot references, frames, selected files, downloads, task progress/continuation, reviewed email with attempt ledger and fresh confirmation. | Draft |
 | 1.2.0 | 2026-11-10 | Automatic routine browsing; critical-action detection and revalidation; visible approval buttons; one-time settings migration. | Draft |
@@ -127,3 +128,7 @@ Before submission: verify native installation and live provider calls; capture c
 A batch review authorizes scoped source downloads and file attachment without repeated routine prompts in automatic mode; final Studio saving/publication requires separate review. Capture lasts 30 minutes, grants expire after 24 hours or browser session termination, and continuation requires renewal. Local metadata includes absolute native download paths (not exposed in model-facing job results). Forgetting jobs does not erase downloaded files. Transfer bytes are sent to the requested website, not the AI model; metadata and requested page content can enter provider context. No Google OAuth/API connector or native desktop helper is bundled. There is no arbitrary-path file tool.
 
 The bridge has a controlled 40 MB Chromium download/file-assignment test. Live authenticated Drive/Studio, current uploader markup, native installation and provider calls remain unverified. Studio checks use English UI heuristics; incomplete extraction blocks finalization. A website save message is not proof of public availability or successful processing. Update the public privacy policy and onboarding with persistent transfer storage, scoped grants and deletion behavior before any store submission.
+
+### Version 1.4.1 disclosure additions
+
+Stalled-transfer diagnostics inspect at most 100 recent Chrome download records, compare only the job's filenames and source constraints, and report matching-file rejection reasons. Unrelated history and native paths are omitted. No new permissions or persistent data categories are added. Matching manual downloads during the reviewed window are eligible; creating a job alone does not start a download, and downloads remain on disk. Rejected rate-limited provider requests may be retried at most three times with bounded waits; quota errors and partial streams are not automatically retried. Actual provider usage and billing terms still apply. Retry status appears in the panel; screenshots should be refreshed before submission.

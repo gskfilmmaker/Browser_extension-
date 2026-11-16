@@ -50,3 +50,14 @@ test('transfer tools reject incomplete or malformed requests',()=>{
  assert.throws(()=>validateArgs('finalize_youtube_upload',{jobId:'x',downloadId:1}),/locator/);
  validateArgs('wait_for_transfer',{jobId:'x',timeout:120000});
 });
+test('stalled job diagnostics distinguish no download, preapproval manual file, wrong source and HTML without paths',async()=>{
+ const f=setup();const job=await transfers.createJob(await transfers.transferPlan(spec(),defaults));
+ let report=await transfers.diagnoseJob(job.id,defaults);assert.match(report.files[0].reasons[0],/no-matching-filename/);
+ f.items.push(download({startTime:new Date(Date.now()-3600000).toISOString()}));report=await transfers.diagnoseJob(job.id,defaults);assert.ok(report.files[0].reasons.includes('download-before-approval'));
+ f.items.splice(0,1,download({url:'https://drive.usercontent.google.com/download?id=wrong-id'}));report=await transfers.diagnoseJob(job.id,defaults);assert.ok(report.files[0].reasons.includes('source-or-drive-file-id-mismatch'));
+ f.items.splice(0,1,download({mime:'text/html'}));report=await transfers.diagnoseJob(job.id,defaults);assert.ok(report.files[0].reasons.includes('download-missing-unsafe-empty-or-html'));assert.ok(!JSON.stringify(report).includes('/test-downloads'));
+ delete f.tabs[1];report=await transfers.diagnoseJob(job.id,defaults);assert.equal(report.source.open,false);
+});
+test('manual downloads within the grant window are recovered from Chrome history, without extension initiation',async()=>{
+ const f=setup();const job=await transfers.createJob(await transfers.transferPlan(spec(),defaults));f.items.push(download());await transfers.refreshJobs();assert.equal((await transfers.getJob(job.id)).files[0].status,'ready');
+});
