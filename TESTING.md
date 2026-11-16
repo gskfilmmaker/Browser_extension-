@@ -1,4 +1,4 @@
-# FramePilot 1.3 personal acceptance tests
+# FramePilot 1.4 personal acceptance tests
 
 This release has passed controlled Chromium/CDP tests, including a mocked-provider email loop. It has not been verified in your authenticated Gmail/Outlook accounts. Use this checklist on your Mac before trusting important workflows. Start with a test account, test messages, and a recipient you control.
 
@@ -10,7 +10,7 @@ git pull origin main
 open -a "Google Chrome" "chrome://extensions/"
 ```
 
-Reload FramePilot, check version 1.3.0, reopen the side panel, and review any Chrome permission changes. Keep Automatic mode for routine steps. Your API key should remain saved. Test with a normal web tab active. Chrome-internal pages are not supported. Close other debugging tools if debugger attachment fails.
+Reload FramePilot, check version 1.4.0, reopen the side panel, and review any Chrome permission changes. Keep Automatic mode for routine steps. Your API key should remain saved. Test with a normal web tab active. Chrome-internal pages are not supported. Close other debugging tools if debugger attachment fails.
 
 ## Test matrix
 
@@ -39,3 +39,19 @@ After a send, check Sent and the recipient mailbox. FramePilot's website confirm
 Record extension version, browser version, provider/model, tool name, exact error, and a sanitized screenshot. Do not include API keys, passwords, private message contents, or client details. A disabled Send control, ambiguous composer, unrecognized recipient chips, reply subject not exposed in the page, or attachment still processing should lead to a blocker or warning rather than an invented success.
 
 Universal site compatibility, native desktop control, CAPTCHA, OS file dialogs, scheduled workflows and service-specific OAuth connectors are outside this release. Document a workflow as verified only after it actually passes on the relevant site/account.
+
+## Download-to-upload acceptance
+
+Controlled tests use a local Drive-style source, intercepted Studio fixture, actual 40 MB download and real CDP file assignment through Chrome API shims. They do not authenticate to Google or load a native installed extension under the managed environment policy. Run `python tests/transfers_test.py` to reproduce.
+
+On your Mac, test one disposable video first:
+
+1. Open the source Drive folder and intended Studio channel. Specify exact filename, title, description, audience and Unlisted visibility.
+2. Approve the batch. Confirm routine source downloads do not prompt repeatedly and Transfers reaches ready. HTML warning pages or unsafe downloads must be rejected.
+3. Confirm the video appears in Studio without dragging. Wait for upload and checks. Review actual filename, channel, title, description, audience and visibility before final approval.
+4. Change the title while approval is open: the old approval must fail. Restore it and request fresh review.
+5. Verify the saved video in Studio, including playback and visibility. A website save confirmation alone does not prove processing or delivery.
+6. Stop, restart Chrome and continue the job: saved progress remains, approval must be renewed, and attached/saved files must not be duplicated. If an attempt is uncertain, inspect Studio manually before proceeding.
+7. Forget the job: its local registry disappears, but downloaded files remain on disk. Delete those separately if needed.
+
+A native installed-extension test, current live Drive download variants and current live YouTube Studio remain required. Do not describe the whole workflow as verified until these pass in your Chrome profile. Test Gmail/Outlook independently; this media update does not establish live email compatibility.

@@ -1,7 +1,7 @@
 # Chrome Web Store Listing — FramePilot
 
-> Last Updated: 2026-11-10
-> Version 1.3.0 · Draft, not submitted or published.
+> Last Updated: 2026-11-16
+> Version 1.4.0 · Draft, not submitted or published.
 
 ## Store Listing
 
@@ -26,7 +26,7 @@ Support: https://github.com/gskfilmmaker/Browser_extension-/issues
 
 **Category:** Productivity
 
-**Single Purpose:** Assist users with reading web pages and completing explicitly requested browser workflows, including forms and reviewed email submission.
+**Single Purpose:** Assist users with reading web pages and completing explicitly requested browser workflows, including forms, reviewed email submission and scoped download-to-upload workflows.
 
 **Primary Language:** English
 
@@ -50,15 +50,15 @@ Capture a native installed FramePilot summary and approval card for the required
 | Permission | Type | Justification |
 | --- | --- | --- |
 | `sidePanel` | permissions | Keeps the user's conversation and approval controls beside the page while browsing. |
-| `storage` | permissions | Saves the user's provider credentials, preferences, and temporary conversation checkpoints. |
+| `storage` | permissions | Saves provider credentials, preferences, temporary checkpoints, and persistent transfer metadata including local download paths. |
 | `scripting` | permissions | Reads page text and a compact element outline when a user-requested task needs page context. |
 | `debugger` | permissions | Captures the visible page and accessibility information and performs approved mouse and keyboard actions. |
 | `tabs` | permissions | Shows tab titles and URLs, identifies the target, and opens, switches, navigates or closes tabs for approved tasks. |
 | `webNavigation` | permissions | Identifies embedded frame IDs and parent frames so requested input is directed to the correct document and site restrictions apply to frame ancestry. |
-| `downloads` | permissions | Initiates downloads the user requested after approval, and verifies completion without automatically opening or executing files. |
+| `downloads` | permissions | Initiates approved downloads, tracks downloads matching reviewed batch source/name/time constraints, resumes registered interrupted downloads when possible, and verifies completion without opening or executing files. |
 | `<all_urls>` | host_permissions | Supports user-directed tasks across arbitrary websites rather than a fixed site. HTTP(S) access is constrained by FramePilot's allowlist, blocklist, approval mode, and rejection of privileged URLs. |
 
-Version 1.3 adds webNavigation and downloads for the features listed above. No remotely hosted code is executed.
+Version 1.3 added webNavigation and downloads; 1.4 adds no new permissions. No remotely hosted code is executed.
 
 ## Privacy & Data Use
 
@@ -75,6 +75,7 @@ Version 1.3 adds webNavigation and downloads for the features listed above. No r
 | Web history | Open tab titles/URLs, page URLs, requested navigation context; no history collection service | When requested as task context | Multi-tab assistance by selected provider |
 | User activity | Chat prompts, task progress, tool actions/results, screenshots and session send-attempt records | As task context | Carry out user requests |
 | Website content | Text, DOM outline, accessibility names, screenshots, console output and email drafts | As task context | Understand and act on pages |
+| Reviewed transfer files | Native paths, source/destination URLs, metadata and attempt records persist locally until forgotten/uninstalled | Video bytes go to the approved website; job metadata and requested page context to the selected provider; native paths omitted from job results | Reviewed large-file uploads |
 | User-selected files | Stored in local IndexedDB; names/sizes can enter task context | Bytes only on approved website upload; metadata to selected AI provider | Attach documents the user selected to the requested workflow |
 
 ### Data Use Certification
@@ -109,6 +110,7 @@ The store developer account's displayed publisher identity is configured in the 
 
 | Version | Date | Changes | Status |
 | --- | --- | --- | --- |
+| 1.4.0 | 2026-11-16 | Persistent scoped transfer jobs, large downloaded-file assignment, transfer continuation and actual YouTube metadata review before final saving. | Draft; live Google workflow unverified |
 | 1.3.0 | 2026-11-10 | Expanded input, snapshot references, frames, selected files, downloads, task progress/continuation, reviewed email with attempt ledger and fresh confirmation. | Draft |
 | 1.2.0 | 2026-11-10 | Automatic routine browsing; critical-action detection and revalidation; visible approval buttons; one-time settings migration. | Draft |
 | 1.1.0 | 2026-11-10 | FramePilot identity, GSK Productions Inc. attribution, vector logo kit, Chrome icons, updated UI and promotional assets. | Draft |
@@ -119,3 +121,9 @@ The store developer account's displayed publisher identity is configured in the 
 Native unpacked extension loading is blocked by the development environment's managed Chrome policy. Syntax and provider/policy unit tests and a CDP-backed tool/worker/UI test are available; live provider calls and native extension integration still require verification on the publisher's computer. Password entry, CAPTCHA, browser/OS dialogs, closed shadow roots and native desktop apps are not supported. Frame and upload restrictions are documented in README. Email composer support is heuristic and has not been validated in live Gmail/Outlook accounts. Automatic mode is the default and executes routine page reads and interactions without per-step confirmation. Critical and unrecognized targets require approval; strict mode remains available. Labels and form context are heuristic evidence, not a guarantee. Version 1.3 adds frame inspection and downloads permissions. User-selected files are stored in local IndexedDB (10 MB/file, 25 MB total) until removed or uninstalled, and are sent to a target website only on approved upload. Draft emails are sent as task context to the AI provider and shown locally for review. Content-keyed send attempts and download IDs are retained in session storage. Default automatic reads mean page context can be transmitted without a separate per-read dialog; disclose all of this in the public policy and onboarding. Existing installs migrate once to Automatic mode, preserving trusted-only restrictions and credentials.
 
 Before submission: verify native installation and live provider calls; capture correctly sized screenshots; publish an accurate privacy policy; supply a support email; verify publisher identity and name availability; complete the store disclosure form. `python scripts/package.py` creates a runtime-only ZIP excluding `.git`, tests, artwork, scripts, and this listing document.
+
+### Version 1.4 disclosure additions
+
+A batch review authorizes scoped source downloads and file attachment without repeated routine prompts in automatic mode; final Studio saving/publication requires separate review. Capture lasts 30 minutes, grants expire after 24 hours or browser session termination, and continuation requires renewal. Local metadata includes absolute native download paths (not exposed in model-facing job results). Forgetting jobs does not erase downloaded files. Transfer bytes are sent to the requested website, not the AI model; metadata and requested page content can enter provider context. No Google OAuth/API connector or native desktop helper is bundled. There is no arbitrary-path file tool.
+
+The bridge has a controlled 40 MB Chromium download/file-assignment test. Live authenticated Drive/Studio, current uploader markup, native installation and provider calls remain unverified. Studio checks use English UI heuristics; incomplete extraction blocks finalization. A website save message is not proof of public availability or successful processing. Update the public privacy policy and onboarding with persistent transfer storage, scoped grants and deletion behavior before any store submission.

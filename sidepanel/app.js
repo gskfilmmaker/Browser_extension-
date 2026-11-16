@@ -2,7 +2,7 @@ import {addFile,listFiles,removeFile} from '../lib/files.js';
 const $=s=>document.querySelector(s);let state;
 const send=async m=>{const r=await chrome.runtime.sendMessage(m);if(r?.error)throw Error(r.error);return r;};
 function node(tag,text,cls){const e=document.createElement(tag);e.textContent=text;if(cls)e.className=cls;return e;}
-function render(s){state=s;$('#status').textContent=s.status;$('#status').classList.toggle('active',s.running);$('#send').disabled=s.running;$('#stop').hidden=!s.running;$('#mode').disabled=s.running;$('#resume').hidden=s.running||!s.lastTask||s.status==='Done';
+function render(s){state=s;$('#status').textContent=s.status;$('#status').classList.toggle('active',s.running);$('#send').disabled=s.running;$('#stop').hidden=!s.running;$('#mode').disabled=s.running;$('#resume').hidden=s.running||!s.lastTask||s.status==='Done';for(const b of document.querySelectorAll('#transfer-jobs button'))b.disabled=s.running;
  const box=$('#messages'),nearBottom=box.scrollHeight-box.scrollTop-box.clientHeight<90;
  if(s.messages.length){box.replaceChildren();for(const m of s.messages){if(m.role==='tool'){const d=node('details','', 'tool');d.append(node('summary',m.text),node('pre',JSON.stringify({arguments:m.args,result:m.result},null,2)));box.append(d);}else box.append(node('article',m.text||(s.running?'Thinking…':''),`message ${m.role}`));}}
  else if(!box.querySelector('.welcome'))box.replaceChildren(node('div','Start a new journey with FramePilot. What would you like to do?','welcome'));
@@ -15,6 +15,8 @@ function render(s){state=s;$('#status').textContent=s.status;$('#status').classL
   const heading=node('strong',p.level==='critical'?'Confirm critical action':p.level==='unknown'?'Check this action':`Approve ${p.name}?`);
   const detail=node('div','','approval-detail');detail.append(node('p',p.notice),node('p',p.url),node('pre',JSON.stringify(p.args,null,2)));
   if(p.review){const review=p.review;detail.replaceChildren(node('p',p.notice),node('p',`From: ${review.sender}`),node('p',`To: ${review.to.join(', ')}`),node('p',`Cc: ${review.cc.join(', ')||'—'} · Bcc: ${review.bcc.join(', ')||'—'}`),node('strong',review.subject),node('pre',review.body),node('p',`Attachments: ${review.attachments.join(', ')||'None detected — verify on the page'}`));for(const link of review.links||[])detail.append(node('p',`${link.text}: ${link.url}`));for(const warning of review.warnings)detail.append(node('p',warning,'review-warning'));}
+  if(p.transferReview){const plan=p.transferReview;detail.replaceChildren(node('p',plan.notice),node('p',`Source: ${plan.sourceURL}`),node('p',`Destination: ${plan.destinationURL}`),node('p',`Channel: ${plan.channel||'Verify on the destination page'} · ID: ${plan.destinationChannelId||'Not a YouTube job'}`),node('p',`Model-round allowance: ${plan.modelRoundLimit} · Up to 30 minutes; provider usage charges apply.`),node('p',`Planned visibility: ${plan.visibility} · Made for kids: ${plan.madeForKids===null?'Not specified — do not guess':plan.madeForKids?'Yes':'No'}`));for(const f of plan.files)detail.append(node('strong',f.name),node('p',`Title: ${f.title??'Not specified'}`),node('pre',f.description??'Description not specified'));}
+  if(p.videoReview){const v=p.videoReview;detail.replaceChildren(node('p',p.notice),node('p',`Channel: ${v.channelName} (${v.channelId})`),node('p',`File: ${v.filename}`),node('strong',v.title),node('pre',v.description),node('p',`Visibility: ${v.visibility} · Made for kids: ${v.madeForKids===null?'Not detected':v.madeForKids?'Yes':'No'}`));for(const warning of v.warnings)detail.append(node('p',warning,'review-warning'));}
   if(p.files)detail.append(node('pre',JSON.stringify(p.files.map(f=>({name:f.name,size:f.size})),null,2)));
   const actions=node('div','','approval-actions');
   for(const [label,approved]of [['Deny',false],['Approve once',true]]){
@@ -31,7 +33,7 @@ $('#prompt').onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey&&!state?.running){e.p
 $('#resume').onclick=()=>send({type:'start',text:'Continue previous task',resume:true}).catch(error);
 $('#stop').onclick=()=>send({type:'stop'}).catch(error);$('#clear').onclick=()=>send({type:'clear'}).catch(error);
 $('#mode').onchange=async()=>{const {settings={}}=await chrome.storage.local.get('settings');settings.mode=$('#mode').value;await chrome.storage.local.set({settings});};
-chrome.storage.onChanged.addListener((changes,area)=>{if(area==='session'&&changes.state)render(changes.state.newValue);if(area==='local'&&changes.settings)$('#mode').value=changes.settings.newValue.mode||'auto';});
+chrome.storage.onChanged.addListener((changes,area)=>{if(area==='session'&&changes.state)render(changes.state.newValue);if(area==='local'&&changes.mediaJobs)renderTransfers().catch(error);if(area==='local'&&changes.settings)$('#mode').value=changes.settings.newValue.mode||'auto';});
 chrome.runtime.onMessage.addListener(m=>{if(m.type==='state')render(m.state);});
 try{render(await send({type:'getState'}));const {settings={}}=await chrome.storage.local.get('settings');$('#mode').value=settings.mode||'auto';}catch(e){error(e);}
 
@@ -42,3 +44,18 @@ async function renderFiles(){
 $('#choose-files').onclick=()=>$('#file-picker').click();
 $('#file-picker').onchange=async()=>{try{for(const file of $('#file-picker').files)await addFile(file);await renderFiles();$('#status').textContent='Files selected locally. Ask FramePilot to attach them; uploading requires approval.';}catch(e){error(e);}finally{$('#file-picker').value='';}};
 renderFiles().catch(error);
+
+async function renderTransfers(){
+ const {mediaJobs=[]}=await chrome.storage.local.get('mediaJobs');
+ $('#transfer-count').textContent=mediaJobs.length?`(${mediaJobs.length})`:'';
+ const box=$('#transfer-jobs');box.replaceChildren();
+ if(!mediaJobs.length){box.append(node('p','No transfer jobs yet. Ask FramePilot to download and upload a named batch.'));return;}
+ for(const job of [...mediaJobs].reverse()){
+  const card=node('div','','transfer-job');card.append(node('strong',job.channel||new URL(job.destinationURL).hostname),node('small',job.status));
+  for(const f of job.files){let progress=f.totalBytes>0&&f.status==='downloading'?` · ${Math.round(100*f.bytesReceived/f.totalBytes)}%`:'';card.append(node('div',`${f.name} · ${f.status}${progress}`));if(f.error)card.append(node('p',f.error,'review-warning'));}
+  const resume=node('button','Continue transfer','quiet');resume.type='button';resume.disabled=state?.running||job.status==='cancelled';resume.onclick=()=>send({type:'start',text:`Continue upload job ${job.id}. Inspect list_upload_jobs/get_upload_job, find the correct source and destination tabs, and resume_upload_job if authorization expired or tab IDs changed. Do not duplicate attached files or uncertain publications. Complete only the approved workflow.`}).catch(error);
+  const forget=node('button','Forget','quiet');forget.type='button';forget.disabled=state?.running;forget.title='Forget this job and revoke its approval; downloaded files stay on disk.';forget.onclick=async()=>{try{await send({type:'forgetUploadJob',jobId:job.id});await renderTransfers();}catch(e){error(e);}};
+  card.append(resume,forget);box.append(card);
+ }
+}
+renderTransfers().catch(error);

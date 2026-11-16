@@ -129,3 +129,11 @@ footer > .developer-credit { color: #626c7c; font-size: 8px; letter-spacing: .2p
 .file-row span { flex: 1; overflow-wrap: anywhere; }
 .file-row button { padding: 2px 5px; font-size: 10px; }
 .composer-actions { flex-wrap: wrap; }
+
+#transfer-panel { flex-shrink: 0; margin: 0 16px 10px; border: 1px solid var(--line); border-radius: 8px; font-size: 11px; background: #f0f1ed; }
+#transfer-panel > summary { padding: 8px 10px; cursor: pointer; color: #4a5c71; }
+#transfer-jobs { max-height: 180px; overflow: auto; padding: 0 10px 8px; }
+.transfer-job { border-top: 1px solid var(--line); padding: 9px 0; overflow-wrap: anywhere; }
+.transfer-job > strong,.transfer-job > small { display: block; margin-bottom: 4px; }
+.transfer-job > button { padding: 4px 7px; font-size: 10px; margin: 7px 5px 0 0; }
+.panel:has(#approval:not([hidden])) #transfer-panel { display: none; }

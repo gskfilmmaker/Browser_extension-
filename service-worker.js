@@ -1,5 +1,7 @@
 import {defaults,SYSTEM,needsApproval,checkURL,validateArgs,migrateSettings} from './lib/policy.js';
 import {tools} from './lib/tools.js';
+import * as transfers from './lib/transfers.js';
+transfers.installDownloadListeners();
 import {complete} from './lib/providers.js';
 import {execute,target,detachAll,prepareAction} from './lib/browser.js';
 let conversation=[];
@@ -15,6 +17,7 @@ chrome.runtime.onMessage.addListener((m,sender,reply)=>{
  (async()=>{await boot;
  switch(m.type){
  case 'getState':return state;
+ case 'forgetUploadJob':if(typeof m.jobId!=='string')throw Error('Invalid job ID.');return await transfers.forgetJob(m.jobId);
  case 'start':if(state.running)throw Error('An agent run is already active.');if(Date.now()-lastStart<3000)throw Error('Wait a few seconds between requests.');if(typeof m.text!=='string'||!m.text.trim()||m.text.length>16000)throw Error('Enter a request under 16,000 characters.');lastStart=Date.now();state.running=true;controller=new AbortController();const request=m.resume&&state.lastTask?`Continue the previous task: ${state.lastTask}. Reinspect the current page and prior results. Do not repeat completed actions or uncertain sends.`:m.text.trim();if(!m.resume){state.lastTask=m.text.trim();state.steps=[];}run(request,m.resume===true).catch(()=>{});return {ok:true};
  case 'approve':if(state.pending?.id!==m.id)throw Error('Approval expired.');pendingResolve?.(m.approved===true);return {ok:true};
  case 'stop':controller?.abort();pendingResolve?.(false);return {ok:true};
@@ -25,15 +28,15 @@ chrome.runtime.onMessage.addListener((m,sender,reply)=>{
 async function approve(name,args,ctx,prepared){
  const risk=prepared.risk;
  const id=crypto.randomUUID();let t=null;
- if(!['get_tabs_context','create_tab','list_files','update_task','get_download_status'].includes(name))t=await target(args.tabId??ctx.tabId,ctx.settings);
+ if(!['get_tabs_context','create_tab','list_files','update_task','get_download_status','create_upload_job','resume_upload_job','list_upload_jobs','get_upload_job','wait_for_transfer','cancel_upload_job','resume_transfer_download'].includes(name))t=await target(prepared.targetTabId??args.tabId??ctx.tabId,ctx.settings);
  const url=t?.url||args.url||'All permitted HTTP(S) tabs';
- state.pending={id,name,args,url,tabId:t?.id,title:t?.title,notice:risk.reason,level:risk.level,review:prepared.review,files:prepared.files};state.status='Waiting for approval';await save();
+ state.pending={id,name,args,url,tabId:t?.id,title:t?.title,notice:risk.reason,level:risk.level,review:prepared.review,files:prepared.files?.map(({localPath,originalURL,finalURL,...f})=>f),transferReview:prepared.transferReview,videoReview:prepared.videoReview};state.status='Waiting for approval';await save();
  const yes=await new Promise(resolve=>{const timer=setTimeout(()=>{pendingResolve=null;resolve(false);},120000);pendingResolve=v=>{clearTimeout(timer);pendingResolve=null;resolve(v);};});
  state.pending=null;await save();if(!yes||ctx.signal.aborted){ctx.denied=true;throw Error('Action denied, expired, or stopped.');}
  if(t){const current=await target(t.id,ctx.settings);if(current.url!==url)throw Error('The page navigated after approval was requested. Please retry.');}
 }
 async function run(text,resume=false){
- const signal=controller.signal;let keepAlive;const timeout=setTimeout(()=>{controller?.abort();pendingResolve?.(false);},600000);
+ const signal=controller.signal;let keepAlive;const timeout=setTimeout(()=>{controller?.abort();pendingResolve?.(false);},1800000);
  try{
  // Chrome API activity keeps an active run alive; no unattended resumption after termination.
  keepAlive=setInterval(()=>chrome.runtime.getPlatformInfo().catch(()=>{}),20000);
@@ -44,10 +47,10 @@ async function run(text,resume=false){
  const ctx={settings,tabId:tab?.id,signal,failureCounts:new Map()};state.taskTabId=ctx.tabId;
  message('user',text);state.status='Thinking';await save();
  // Checkpoints contain completed tool turns only; screenshot bytes are not retained.
- const history=[{role:'system',text:SYSTEM},...conversation,{role:'user',text:`Target tab ID: ${ctx.tabId}. Budget: up to ${Math.min(40,settings.maxSteps||35)} model rounds and 10 minutes. User request: ${text}`}];
+ const history=[{role:'system',text:SYSTEM},...conversation,{role:'user',text:`Target tab ID: ${ctx.tabId}. Budget: up to ${Math.min(120,settings.maxSteps||60)} model rounds (a reviewed transfer can extend to ${Math.min(120,Math.max(settings.maxSteps||60,settings.mediaMaxSteps||80))}) and 30 minutes. User request: ${text}`}];
  if(JSON.stringify(history).length>1500000)throw Error('Conversation is too long. Start a new chat.');
  const checkpoint=async()=>{conversation=history.slice(1).map(m=>m.image?{role:'tool',id:m.id,result:{screenshot:'Image from a previous turn; capture again if needed.'}}:m);await chrome.storage.session.set({conversation});};
- for(let step=0;step<Math.min(40,settings.maxSteps||20);step++){
+ for(let step=0;step<Math.min(120,ctx.mediaJobId?Math.max(settings.maxSteps||60,settings.mediaMaxSteps||80):(settings.maxSteps||60));step++){
  signal.throwIfAborted();state.status='Thinking';const m=message('assistant','');await save();let scheduled=false;
  const answer=await complete(settings,history,signal,delta=>{m.text+=delta;if(!scheduled){scheduled=true;setTimeout(()=>{scheduled=false;save().catch(()=>{});},80);}});
  m.text=answer.text;history.push({role:'assistant',text:answer.text,calls:answer.calls});await save();
